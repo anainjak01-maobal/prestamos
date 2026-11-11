@@ -381,7 +381,8 @@ function datosHtml(c, cl) {
 export function abrirPago(app, p, { onDone } = {}) {
   const c = calcular(p, today(), cfg());
   const cl = getCliente(p.clienteId);
-  const sug = c.cuotaSugeridaHoy || Math.min(c.saldo, c.valorCuota);
+  // Por defecto, el valor de la cuota pactada (o el saldo, si es menor).
+  const sug = Math.min(c.saldo, c.valorCuota);
   const chips = [[`Cuota ${money(Math.min(c.valorCuota, c.saldo))}`, Math.min(c.valorCuota, c.saldo)]];
   if (c.atraso > c.valorCuota) chips.push([`Lo atrasado ${money(c.atraso)}`, c.atraso]);
   chips.push([`Todo ${money(c.saldo)}`, c.saldo]);
