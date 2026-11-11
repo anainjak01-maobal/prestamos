@@ -174,7 +174,9 @@ export function detalle(app, id) {
     alertas += `<div class="alert ${c.diasMora >= cfg().alertaMora ? 'danger' : 'info'}">${icon('clock')}<div class="grow">
       <b>Debe ${money(c.atraso)}</b> <span class="small">(${n} cuota${n > 1 ? 's' : ''})</span>
       <p>Atrasado desde el ${fdate(c.proxima)} · ${c.diasMora} día${c.diasMora > 1 ? 's' : ''} de mora.</p>
-      <button class="btn sm" data-recordar>${icon('chat', 'sm')} Recordar por WhatsApp</button></div></div>`;
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <button class="btn primary sm" data-varios>${icon('calendar', 'sm')} Registrar varios pagos</button>
+        <button class="btn sm" data-recordar>${icon('chat', 'sm')} Recordar por WhatsApp</button></div></div></div>`;
   }
   if (puedeEliminarCarton(c)) {
     alertas += `<div class="alert info">${icon('checkCircle')}<div class="grow"><b>Pagó todo · está en el historial</b>
@@ -263,6 +265,7 @@ export function detalle(app, id) {
   $('[data-mas]', main.parentElement).onclick = () => abrirMas(app, p, c);
   $('[data-carton]', main)?.addEventListener('click', () => confirmarEliminarCarton(app, p, c));
   $('[data-recordar]', main)?.addEventListener('click', () => abrirRecordatorio(p));
+  $('[data-varios]', main)?.addEventListener('click', () => abrirVariosPagos(app, p));
 }
 
 /** Recordatorio de cobro: muestra el mensaje para revisarlo o cambiarlo y lo abre en WhatsApp. */
@@ -387,15 +390,18 @@ export function abrirPago(app, p, { onDone } = {}) {
     ico: 'cash',
     tone: 'tone-ok',
     body: `<p class="small muted" style="margin-top:-6px">${esc(cl?.nombre || '')} · Préstamo #${p.id} · Saldo <b>${money(c.saldo)}</b></p>
+      ${c.atraso > c.valorCuota ? `<button type="button" class="btn block" data-varios style="margin-bottom:14px">${icon('calendar', 'sm')} Registrar varios pagos (días atrasados)</button>` : ''}
+      ${field('Fecha del pago', `<input type="date" name="fecha" value="${today()}" max="${today()}">`, 'Cámbiala si el pago fue otro día.')}
       ${moneyField('valor', 'Valor que paga', sug)}
       <div class="quick-amts">${chips.map(([t, v]) => `<button type="button" data-v="${v}">${esc(t)}</button>`).join('')}</div>
-      <div class="grid2">
-        ${field('Fecha', `<input type="date" name="fecha" value="${today()}">`)}
-        ${field('Nota', '<input name="nota" placeholder="Opcional">')}
-      </div>
+      ${field('Nota', '<input name="nota" placeholder="Opcional">')}
       <div class="summary" data-res></div>
       <div class="btn-row"><button class="btn" data-ok="wa">${icon('chat', 'sm')} Guardar y avisar</button><button class="btn primary" data-ok="1">${icon('check', 'sm')} Guardar</button></div>`,
     onMount(el, api) {
+      $('[data-varios]', el)?.addEventListener('click', () => {
+        api.close();
+        afterLayers(() => abrirVariosPagos(app, p, { onDone }));
+      });
       const inp = $('[name=valor]', el);
       const upd = () => {
         const v = parseMoney(inp.value);
@@ -422,6 +428,91 @@ export function abrirPago(app, p, { onDone } = {}) {
         if (b.dataset.ok === 'wa') enviarTexto(p);
         refreshLuego(app, onDone);
       }));
+    },
+  });
+}
+
+/** Registrar varios pagos de días anteriores de una sola vez (para ponerse al día). */
+export function abrirVariosPagos(app, p, { onDone } = {}) {
+  const hoy = today();
+  const c = calcular(p, hoy, cfg());
+  const cl = getCliente(p.clienteId);
+  const vc = c.valorCuota;
+  const parcial = Math.max(0, c.ciclo.pagado - c.cubiertas * vc); // lo ya abonado a la cuota en curso
+  const filas = [];
+  for (let i = c.cubiertas; i < c.fechas.length && filas.length < 90; i++) {
+    if (c.fechas[i] > hoy) break;
+    filas.push({ fecha: c.fechas[i], valor: i === c.cubiertas ? vc - parcial : vc });
+  }
+  if (!filas.length) filas.push({ fecha: hoy, valor: Math.min(vc, c.saldo) });
+  const filaHtml = (f, i) => `<div class="vp-row" data-i="${i}">
+      <label class="vp-check"><input type="checkbox" data-chk></label>
+      <input type="date" class="input" data-fecha value="${f.fecha}" max="${hoy}">
+      <input class="input money num" data-valor value="${num(f.valor)}" inputmode="numeric">
+    </div>`;
+  sheet({
+    title: 'Registrar varios pagos',
+    ico: 'calendar',
+    tone: 'tone-ok',
+    body: `<p class="small muted" style="margin-top:-6px">${esc(cl?.nombre || '')} · Préstamo #${p.id} · Saldo <b>${money(c.saldo)}</b></p>
+      <p class="small" style="margin:0 0 10px">Marca los días que te pagó. Puedes cambiar la fecha o el valor de cada uno.</p>
+      <div class="row between" style="margin-bottom:6px">
+        <button type="button" class="btn ghost sm" data-todas style="padding-left:0">${icon('checkCircle', 'sm')} Marcar todas</button>
+        <span class="tiny muted">${filas.length} cuota${filas.length > 1 ? 's' : ''} pendiente${filas.length > 1 ? 's' : ''}</span>
+      </div>
+      <div class="vp-head"><span></span><span>Fecha</span><span>Valor</span></div>
+      <div data-filas>${filas.map(filaHtml).join('')}</div>
+      <button type="button" class="btn ghost sm" data-agregar style="padding-left:0;margin:4px 0 12px">${icon('plus', 'sm')} Agregar otro pago</button>
+      <div class="summary" data-res></div>
+      <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar pagos marcados</button>`,
+    onMount(el, api) {
+      const cont = $('[data-filas]', el);
+      const marcados = () => $$('.vp-row', cont).filter((r) => $('[data-chk]', r).checked)
+        .map((r) => ({ fecha: $('[data-fecha]', r).value, valor: parseMoney($('[data-valor]', r).value) }));
+      const upd = () => {
+        const m = marcados();
+        const tot = m.reduce((s, x) => s + x.valor, 0);
+        const queda = c.saldo - tot;
+        $('[data-res]', el).innerHTML = `<div class="r"><span>${m.length} pago${m.length === 1 ? '' : 's'} marcado${m.length === 1 ? '' : 's'}</span><b style="color:var(--ok)">${money(tot)}</b></div>
+          <div class="r total"><span>${queda <= 0 ? '¡Queda a paz y salvo!' : 'Queda debiendo'}</span><b>${money(Math.max(0, queda))}</b></div>
+          ${queda < 0 ? `<div class="r small" style="color:var(--danger)"><span>Supera el saldo en ${money(-queda)}</span></div>` : ''}`;
+        $$('.vp-row', cont).forEach((r) => r.classList.toggle('on', $('[data-chk]', r).checked));
+      };
+      const bindFila = (r) => {
+        moneyInput($('[data-valor]', r));
+        r.addEventListener('input', upd);
+        r.addEventListener('change', upd);
+        // Al cambiar fecha o valor, se marca sola
+        ['[data-fecha]', '[data-valor]'].forEach((s) => $(s, r).addEventListener('input', () => { $('[data-chk]', r).checked = true; upd(); }));
+      };
+      $$('.vp-row', cont).forEach(bindFila);
+      $('[data-todas]', el).onclick = () => {
+        const filasEl = $$('.vp-row', cont);
+        const todas = filasEl.every((r) => $('[data-chk]', r).checked);
+        filasEl.forEach((r) => ($('[data-chk]', r).checked = !todas));
+        upd();
+      };
+      $('[data-agregar]', el).onclick = () => {
+        cont.insertAdjacentHTML('beforeend', filaHtml({ fecha: hoy, valor: Math.min(vc, c.saldo) }, cont.children.length));
+        const r = cont.lastElementChild;
+        $('[data-chk]', r).checked = true;
+        bindFila(r);
+        upd();
+      };
+      upd();
+      $('[data-ok]', el).onclick = async () => {
+        const m = marcados();
+        if (!m.length) return toast('Marca al menos un pago', 'err');
+        if (m.some((x) => !x.fecha || !(x.valor > 0))) return toast('Revisa la fecha y el valor de cada pago marcado', 'err');
+        if (m.some((x) => x.fecha > hoy)) return toast('No puede haber pagos con fecha futura', 'err');
+        const tot = m.reduce((s, x) => s + x.valor, 0);
+        if (tot > c.saldo) return toast('Los pagos superan el saldo del préstamo', 'err');
+        m.sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).forEach((x, i) => addMov(p, { tipo: 'pago', fecha: x.fecha, valor: x.valor, nota: '', ts: Date.now() + i }));
+        await app.save();
+        api.close();
+        toast(`${m.length} pago${m.length > 1 ? 's' : ''} registrado${m.length > 1 ? 's' : ''} · ${money(tot)}`);
+        refreshLuego(app, onDone);
+      };
     },
   });
 }

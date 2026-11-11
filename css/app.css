@@ -237,6 +237,15 @@ main.view { flex: 1; padding: 4px 16px calc(var(--tabbar-h) + var(--safe-b) + 92
 .summary .r b { font-variant-numeric: tabular-nums; }
 .summary .r.total { border-top: 1px dashed var(--border); margin-top: 6px; padding-top: 9px; font-size: 16px; }
 
+/* ===== Varios pagos ===== */
+.vp-head, .vp-row { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 8px; align-items: center; }
+.vp-head { font-size: 11.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; padding: 0 2px 6px; }
+.vp-row { padding: 6px 4px; border-radius: 12px; margin-bottom: 4px; }
+.vp-row.on { background: var(--ok-soft); }
+.vp-row .input { padding: 10px; border: 1.5px solid var(--border); background: var(--surface); border-radius: 11px; width: 100%; min-width: 0; color: var(--text); }
+.vp-check { display: grid; place-items: center; }
+.vp-check input { width: 22px; height: 22px; accent-color: var(--primary); }
+
 /* ===== Loan detail ===== */
 .loan-head .saldo { font-size: 34px; font-weight: 850; letter-spacing: -.02em; }
 .progress { height: 10px; background: rgba(255, 255, 255, .22); border-radius: 999px; overflow: hidden; margin: 10px 0 6px; }
