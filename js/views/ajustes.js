@@ -4,8 +4,10 @@ import { $, esc, fdate, diffDays, today, parseNum } from '../utils.js';
 import { sheet, toast, field, switchHtml, confirmDialog, pwField, bindPw, afterLayers } from '../ui.js';
 import * as store from '../store.js';
 import { exportBackup, pickBackupFile, pickMigrationFile } from '../backup.js';
+import { VERSION } from '../version.js';
+import { buscarActualizacion } from '../update.js';
 
-const VERSION_APP = '1.0.0';
+const VERSION_APP = VERSION;
 
 function infoRespaldo(cfg) {
   const u = cfg.ultimoRespaldo;
@@ -32,6 +34,7 @@ export function mas(app) {
     <div class="list menu">
       <a class="item" href="#/ajustes"><span class="ico tone-primary">${icon('sliders')}</span><span class="grow t">Ajustes</span>${icon('next', 'sm')}</a>
       <button class="item" data-o="bloquear"><span class="ico tone-info">${icon('lock')}</span><span class="grow t">Bloquear ahora</span>${icon('next', 'sm')}</button>
+      <button class="item" data-o="actualizar"><span class="ico tone-ok">${icon('refresh')}</span><span class="grow"><span class="t">Buscar actualización</span><br><span class="s">Versión instalada: ${VERSION}</span></span>${icon('next', 'sm')}</button>
     </div>
     <p class="tiny muted" style="text-align:center;margin-top:20px">Control de Cobros v${VERSION_APP} · ${s.clientes.length} clientes · ${s.prestamos.length} préstamos<br>Los datos se guardan cifrados solo en este teléfono.</p>`;
   main.addEventListener('click', (e) => {
@@ -40,6 +43,7 @@ export function mas(app) {
     else if (o === 'importar') importar(app);
     else if (o === 'excel') importarExcel(app);
     else if (o === 'bloquear') app.lock();
+    else if (o === 'actualizar') buscarActualizacion({ avisarSiNoHay: true });
   });
 }
 

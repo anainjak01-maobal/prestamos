@@ -1,0 +1,9 @@
+{
+  "version": "1.2.0",
+  "fecha": "2026-11-11",
+  "novedades": [
+    "Aviso cuando hay una versión nueva, con botón para actualizar al instante.",
+    "Las actualizaciones llegan apenas se publican (sin esperar 10 minutos).",
+    "Pantalla de novedades después de cada actualización."
+  ]
+}

@@ -11,6 +11,7 @@ import * as prestamo from './views/prestamo.js';
 import * as estadisticas from './views/estadisticas.js';
 import * as capital from './views/capital.js';
 import * as ajustes from './views/ajustes.js';
+import { buscarActualizacion, mostrarNovedadesSiCorresponde } from './update.js';
 
 const root = document.getElementById('app');
 
@@ -105,8 +106,13 @@ function revisarBloqueo() {
 }
 setInterval(revisarBloqueo, 15000);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') revisarBloqueo();
+  if (document.visibilityState === 'visible') {
+    revisarBloqueo();
+    buscarActualizacion();
+  }
 });
+// Revisa si hay versión nueva cada 30 minutos mientras la app está abierta.
+setInterval(() => buscarActualizacion(), 30 * 60000);
 
 export function bloquear() {
   closeAllLayers();
@@ -119,6 +125,7 @@ function entrar() {
   ultimaActividad = Date.now();
   lastPath = null;
   render();
+  mostrarNovedadesSiCorresponde();
 }
 
 async function boot() {
@@ -131,6 +138,7 @@ async function boot() {
   }
   if (await store.hasAccount()) auth.renderLogin(root, entrar);
   else auth.renderSetup(root, entrar);
+  buscarActualizacion();
 }
 
 boot();

@@ -1,13 +1,16 @@
 // Service worker: permite instalar la app y usarla sin internet.
 // Estrategia: primero la red (para recibir siempre la última versión) y, sin conexión, la copia guardada.
 // Al cambiar archivos, subir la VERSION para limpiar la caché vieja.
-const VERSION = 'cobros-v2';
+const VERSION = 'cobros-v3';
 const ARCHIVOS = [
   './',
   './index.html',
   './manifest.json',
+  './version.json',
   './css/app.css',
   './js/app.js',
+  './js/version.js',
+  './js/update.js',
   './js/utils.js',
   './js/icons.js',
   './js/idb.js',
@@ -47,10 +50,14 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // "no-cache": siempre pregunta al servidor si hay versión nueva (si no cambió, la respuesta es mínima).
+  const fresco = req.mode === 'navigate'
+    ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+    : fetch(req, { cache: req.cache === 'no-store' ? 'no-store' : 'no-cache' });
   e.respondWith(
-    fetch(req)
+    fresco
       .then((res) => {
-        if (res.ok) {
+        if (res.ok && !new URL(req.url).search) {
           const copia = res.clone();
           caches.open(VERSION).then((c) => c.put(req, copia));
         }
