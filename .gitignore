@@ -1,0 +1,16 @@
+# Datos reales: NUNCA subir al repositorio (GitHub Pages es público)
+*.xlsm
+*.xlsx
+*.xls
+*.jpeg
+*.jpg
+*respaldo*.json
+migracion*.json
+datos/
+
+# Notas del proyecto: mencionan clientes, socios y montos reales
+CLAUDE.md
+
+# Herramientas locales
+__pycache__/
+.claude/
