@@ -257,6 +257,34 @@ export function prestadoPorMes(state) {
   return out;
 }
 
+// ---- Eliminar cartón de un préstamo pagado ----
+/** ¿Se puede eliminar el cartón? Solo préstamos pagados que aún tienen el detalle de abonos. */
+export function puedeEliminarCarton(c) {
+  // Con un solo movimiento (p. ej. el historial importado del Excel) no hay detalle que borrar.
+  return c.estado === 'pagado' && !c.p.cartonEliminado && (c.p.movs || []).length > 1;
+}
+
+/**
+ * Borra el detalle de abonos de un préstamo pagado y deja un resumen que conserva la ganancia
+ * (como la hoja GANANCIAS): un solo pago por el total y, si hubo, los intereses adicionales en una línea.
+ */
+export function eliminarCarton(p, c, hoy = today()) {
+  const fechas = (p.movs || []).filter((m) => m.tipo === 'pago' || m.tipo === 'renovacion').map((m) => m.fecha).sort();
+  const fechaPago = fechas[fechas.length - 1] || p.fecha;
+  const n = (p.movs || []).length;
+  // Vuelve a las condiciones iniciales del préstamo (el ciclo 0) y resume lo demás
+  const base = c.ciclos[0].total;
+  const extra = c.pagado - base;
+  const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const movs = [];
+  if (extra > 0) movs.push({ id: id(), ts: 1, tipo: 'interes', fecha: fechaPago, valor: extra, nota: 'Intereses adicionales y renovaciones (resumen)' });
+  if (extra < 0) movs.push({ id: id(), ts: 1, tipo: 'ajuste', fecha: fechaPago, valor: extra, nota: 'Descuentos (resumen)' });
+  movs.push({ id: id(), ts: 2, tipo: 'pago', fecha: fechaPago, valor: c.pagado, nota: 'Pagó todo (cartón eliminado)' });
+  p.movs = movs;
+  p.cartonEliminado = { fecha: hoy, movimientos: n };
+  return p;
+}
+
 // ---- Capital de socios ----
 export function movsSocio(s) {
   const movs = [...(s.movs || [])].sort(ordenMovs);

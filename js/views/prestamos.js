@@ -1,8 +1,8 @@
 // Lista de préstamos con filtros.
 import { icon } from '../icons.js';
 import { esc, money, norm, avatarTone, initials, fshort, today, $ } from '../utils.js';
-import { calcular, ESTADOS } from '../logic.js';
-import { emptyState, badge } from '../ui.js';
+import { calcular, ESTADOS, puedeEliminarCarton, eliminarCarton } from '../logic.js';
+import { emptyState, badge, confirmDialog, toast } from '../ui.js';
 import { getCliente } from '../store.js';
 
 export function estadoBadge(c) {
@@ -50,7 +50,7 @@ const FILTROS = [
   ['atrasados', 'Atrasados', (c) => c.estado === 'atrasado'],
   ['vencidos', 'Plazo vencido', (c) => c.estado === 'vencido'],
   ['interes', 'Interés pendiente', (c) => !!c.interesPendiente],
-  ['pagados', 'Pagados', (c) => c.estado === 'pagado'],
+  ['pagados', 'Historial (pagados)', (c) => c.estado === 'pagado'],
   ['anulados', 'Anulados', (c) => c.estado === 'anulado'],
   ['todos', 'Todos', () => true],
 ];
@@ -79,9 +79,27 @@ export function lista(app, _p, query) {
       const n = calcs.filter(fn).length;
       return `<button class="chip ${id === filtroActual ? 'on' : ''}" data-f="${id}">${txt}<span class="n">${n}</span></button>`;
     }).join('');
-    $('[data-list]', main).innerHTML = items.length
+    const conCarton = filtroActual === 'pagados' ? calcs.filter(puedeEliminarCarton) : [];
+    const barraHistorial = conCarton.length
+      ? `<div class="alert info">${icon('file')}<div class="grow"><b>${conCarton.length} pagado${conCarton.length > 1 ? 's' : ''} con cartón</b>
+          <p>Puedes eliminar el detalle de abonos y dejar solo el registro de la ganancia.</p>
+          <button class="btn sm" data-borrar-cartones>${icon('trash', 'sm')} Eliminar todos los cartones</button></div></div>`
+      : '';
+    $('[data-list]', main).innerHTML = barraHistorial + (items.length
       ? `<div class="list">${items.map((c) => itemPrestamo(c)).join('')}</div>`
-      : emptyState('wallet', 'Sin préstamos aquí', filtroActual === 'activos' ? 'Crea el primero con el botón “Nuevo préstamo”.' : 'No hay préstamos con este filtro.');
+      : emptyState('wallet', 'Sin préstamos aquí', filtroActual === 'activos' ? 'Crea el primero con el botón “Nuevo préstamo”.' : 'No hay préstamos con este filtro.'));
+    $('[data-borrar-cartones]', main)?.addEventListener('click', async () => {
+      if (!(await confirmDialog({
+        title: `¿Eliminar ${conCarton.length} cartones?`,
+        text: 'Se borra el detalle de abonos de los préstamos ya pagados. Quedan el capital, el interés, el total pagado y la fecha, así que las ganancias no cambian. <b>No se puede deshacer.</b>',
+        ok: 'Eliminar cartones',
+        danger: true,
+      }))) return;
+      for (const c of conCarton) eliminarCarton(c.p, c);
+      await app.save();
+      toast(`${conCarton.length} cartones eliminados`);
+      app.refresh();
+    });
   };
 
   main.innerHTML = `<div class="search">${icon('search', 'sm')}<input type="search" placeholder="Buscar por cliente o número" value="${esc(busqueda)}"></div>

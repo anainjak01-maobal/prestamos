@@ -1,7 +1,7 @@
 // Detalle de un préstamo, nuevo préstamo y todas sus acciones (cobrar, intereses, renovación, ajustes, tarjeta).
 import { icon } from '../icons.js';
 import { $, $$, esc, money, num, fdate, fshort, today, parseMoney, parseNum, relDays, avatarTone, initials, moneyInput } from '../utils.js';
-import { calcular, generarFechas, cuotaSugerida, interesDe, MODALIDADES, CUOTAS_DEFECTO } from '../logic.js';
+import { calcular, generarFechas, cuotaSugerida, interesDe, MODALIDADES, CUOTAS_DEFECTO, puedeEliminarCarton, eliminarCarton } from '../logic.js';
 import { sheet, confirmDialog, toast, field, moneyField, segHtml, segValue, switchHtml, fullscreen, afterLayers, emptyState, bindSegs } from '../ui.js';
 import { getCliente, getPrestamo, addMov, addPrestamo } from '../store.js';
 import * as store from '../store.js';
@@ -162,6 +162,15 @@ export function detalle(app, id) {
       <b>Debe ${money(c.atraso)}</b> <span class="small">(${n} cuota${n > 1 ? 's' : ''})</span>
       <p style="margin-bottom:0">Atrasado desde el ${fdate(c.proxima)} · ${c.diasMora} día${c.diasMora > 1 ? 's' : ''} de mora.</p></div></div>`;
   }
+  if (puedeEliminarCarton(c)) {
+    alertas += `<div class="alert info">${icon('checkCircle')}<div class="grow"><b>Pagó todo · está en el historial</b>
+      <p>Si ya no necesitas el detalle de abonos, elimina el cartón. Queda solo el registro de la ganancia (${money(c.gananciaCobrada)}).</p>
+      <button class="btn sm" data-carton>${icon('trash', 'sm')} Eliminar cartón</button></div></div>`;
+  }
+  if (p.cartonEliminado) {
+    alertas += `<div class="alert info">${icon('file')}<div class="grow"><b>Cartón eliminado</b>
+      <p style="margin:0">El ${fdate(p.cartonEliminado.fecha)} se borró el detalle (${p.cartonEliminado.movimientos} movimientos). Se conserva la ganancia de ${money(c.gananciaCobrada)}.</p></div></div>`;
+  }
   if (p.estado === 'anulado') alertas += `<div class="alert info">${icon('ban')}<div class="grow"><b>Préstamo anulado</b><p style="margin:0">No cuenta en la cartera ni en las ganancias.</p></div></div>`;
 
   main.innerHTML = `
@@ -238,6 +247,20 @@ export function detalle(app, id) {
     refreshLuego(app);
   });
   $('[data-mas]', main.parentElement).onclick = () => abrirMas(app, p, c);
+  $('[data-carton]', main)?.addEventListener('click', () => confirmarEliminarCarton(app, p, c));
+}
+
+async function confirmarEliminarCarton(app, p, c) {
+  if (!(await confirmDialog({
+    title: '¿Eliminar el cartón?',
+    text: `Se borran los ${p.movs.length} movimientos del préstamo #${p.id}. Quedan el capital (${money(p.capital)}), el total pagado (${money(c.pagado)}) y la ganancia (${money(c.gananciaCobrada)}). <b>No se puede deshacer.</b>`,
+    ok: 'Eliminar cartón',
+    danger: true,
+  }))) return;
+  eliminarCarton(p, c);
+  await app.save();
+  toast('Cartón eliminado. La ganancia se conserva.');
+  refreshLuego(app);
 }
 
 function movsHtml(c) {
@@ -582,6 +605,7 @@ function abrirMas(app, p, c) {
     title: `Préstamo #${p.id}`,
     ico: 'wallet',
     body: `<div class="list menu">
+      ${puedeEliminarCarton(c) ? `<button class="item" data-o="carton"><span class="ico tone-ok">${icon('file')}</span><span class="grow"><span class="t">Eliminar cartón</span><br><span class="s">Deja solo el registro de la ganancia</span></span>${icon('next', 'sm')}</button>` : ''}
       <button class="item" data-o="ajuste"><span class="ico tone-info">${icon('sliders')}</span><span class="grow t">Ajuste manual del saldo</span>${icon('next', 'sm')}</button>
       <button class="item" data-o="anular"><span class="ico tone-warn">${icon('ban')}</span><span class="grow t">${p.estado === 'anulado' ? 'Reactivar préstamo' : 'Anular préstamo'}</span>${icon('next', 'sm')}</button>
       <button class="item" data-o="eliminar"><span class="ico tone-danger">${icon('trash')}</span><span class="grow t">Eliminar préstamo</span>${icon('next', 'sm')}</button>
@@ -590,7 +614,10 @@ function abrirMas(app, p, c) {
       $('.menu', el).onclick = async (e) => {
         const b = e.target.closest('[data-o]');
         if (!b) return;
-        if (b.dataset.o === 'ajuste') {
+        if (b.dataset.o === 'carton') {
+          api.close();
+          afterLayers(() => confirmarEliminarCarton(app, p, c));
+        } else if (b.dataset.o === 'ajuste') {
           api.close();
           afterLayers(() => abrirAjuste(app, p));
         } else if (b.dataset.o === 'anular') {

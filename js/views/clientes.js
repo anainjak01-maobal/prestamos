@@ -59,6 +59,8 @@ export function detalle(app, id) {
   const calcs = store.prestamosDe(id).map((p) => calcular(p, hoy, app.state.config)).sort((a, b) => b.activo - a.activo || b.p.id - a.p.id);
   const r = resumenCliente(cl, calcs);
   const pagado = calcs.reduce((s, c) => s + c.pagado, 0);
+  const historial = calcs.filter((c) => !c.activo);
+  const ganHist = historial.reduce((s, c) => s + c.gananciaCobrada, 0);
   const main = app.shell({
     title: cl.nombre,
     back: '#/clientes',
@@ -82,8 +84,14 @@ export function detalle(app, id) {
       <div class="kpi"><div class="ico tone-ok">${icon('cash', 'sm')}</div><div class="v num">${money(pagado)}</div><div class="l">Total pagado</div></div>
     </div>
     ${cl.notas ? `<div class="card"><h3>Notas</h3><p style="margin:0;white-space:pre-wrap">${esc(cl.notas)}</p></div>` : ''}
-    <div class="section-title">Préstamos <span class="muted">${calcs.length}</span></div>
-    ${calcs.length ? `<div class="list">${calcs.map((c) => itemPrestamo(c, { showCliente: false })).join('')}</div>` : emptyState('wallet', 'Sin préstamos', 'Crea uno con “Nuevo préstamo”.')}
+    <div class="section-title">Préstamos activos <span class="muted">${r.activos.length}</span></div>
+    ${r.activos.length ? `<div class="list">${r.activos.map((c) => itemPrestamo(c, { showCliente: false })).join('')}</div>` : emptyState('checkCircle', 'Sin deudas', calcs.length ? 'Todos sus préstamos están pagados.' : 'Crea uno con “Nuevo préstamo”.')}
+    ${historial.length ? `<details class="card flat" style="padding:12px 14px">
+      <summary class="row between" style="cursor:pointer;list-style:none">
+        <span class="row" style="gap:8px">${icon('clock', 'sm')}<b>Historial</b><span class="muted small">${historial.length} pagado${historial.length > 1 ? 's' : ''}</span></span>
+        <span class="small muted">Ganancia <b style="color:var(--ok)">${money(ganHist)}</b></span></summary>
+      <div class="list" style="margin:12px 0 0;box-shadow:none;border:1px solid var(--border)">${historial.map((c) => itemPrestamo(c, { showCliente: false })).join('')}</div>
+    </details>` : ''}
     <button class="btn danger block" data-del style="margin-top:10px">${icon('trash', 'sm')} Eliminar cliente</button>`;
   bindLista(main, app);
   main.parentElement.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => abrirFormCliente(app, cl, () => afterLayers(() => app.refresh()))));
