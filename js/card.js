@@ -189,6 +189,23 @@ export function textoEstadoCuenta({ negocio, cliente, calc, ultimos = 8 }) {
   return out.join('\n');
 }
 
+/** Mensaje de recordatorio de cobro para un cliente atrasado. */
+export function textoRecordatorio({ negocio, cliente, calc }) {
+  const nombre = (cliente?.nombre || '').split(/\s+/)[0] || '';
+  const n = Math.max(1, Math.ceil(calc.atraso / calc.valorCuota));
+  const out = [`Hola ${nombre}, le saludamos de *${negocio || 'Control de Cobros'}*.`];
+  if (calc.vencido) {
+    out.push(`Le recordamos que el plazo de su préstamo venció el ${fdate(calc.fechaFin)} y tiene un saldo pendiente de *${money(calc.saldo)}*.`);
+  } else if (calc.atraso > 0) {
+    out.push(`Le recordamos que tiene ${n} cuota${n > 1 ? 's' : ''} pendiente${n > 1 ? 's' : ''} por *${money(calc.atraso)}*${calc.diasMora > 0 ? ` (desde el ${fdate(calc.proxima)})` : ''}.`);
+    out.push(`Saldo total del préstamo: ${money(calc.saldo)}.`);
+  } else {
+    out.push(`Le recordamos su cuota de ${money(calc.valorCuota)}. Saldo pendiente: ${money(calc.saldo)}.`);
+  }
+  out.push('Quedamos atentos a su pago. ¡Gracias!');
+  return out.join('\n');
+}
+
 export function openWhatsApp(tel, texto, indicativo) {
   const t = waPhone(tel, indicativo);
   const url = `https://wa.me/${t}?text=${encodeURIComponent(texto)}`;

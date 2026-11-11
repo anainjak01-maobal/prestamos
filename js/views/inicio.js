@@ -6,6 +6,7 @@ import { emptyState } from '../ui.js';
 import { itemPrestamo, bindLista } from './prestamos.js';
 import { abrirPago } from './prestamo.js';
 import { abrirFormCliente } from './clientes.js';
+import { abrirGasto } from './gastos.js';
 import { exportBackup } from '../backup.js';
 import { getPrestamo } from '../store.js';
 import { toast } from '../ui.js';
@@ -57,8 +58,8 @@ export function render(app) {
     <div class="quick">
       <button data-q="nuevo"><span class="ico tone-primary">${icon('plus')}</span>Préstamo</button>
       <button data-q="cliente"><span class="ico tone-info">${icon('userPlus')}</span>Cliente</button>
-      <button data-q="capital"><span class="ico tone-violet">${icon('bank')}</span>Capital</button>
-      <button data-q="respaldo"><span class="ico tone-ok">${icon('shield')}</span>Respaldo</button>
+      <button data-q="gasto"><span class="ico tone-warn">${icon('cash')}</span>Gasto</button>
+      <button data-q="cierre"><span class="ico tone-ok">${icon('checkCircle')}</span>Cierre del día</button>
     </div>
     <div class="kpis" style="margin-top:14px">
       <div class="kpi"><div class="ico tone-info">${icon('coins', 'sm')}</div><div class="v num">${money(r.enCalle)}</div><div class="l">Capital en la calle</div></div>
@@ -83,8 +84,8 @@ export function render(app) {
     const q = e.target.closest('[data-q]')?.dataset.q;
     if (q === 'nuevo') app.go('#/nuevo');
     else if (q === 'cliente') abrirFormCliente(app, null, (c) => app.go(`#/cliente/${c.id}`));
-    else if (q === 'capital') app.go('#/capital');
-    else if (q === 'respaldo') respaldo();
+    else if (q === 'gasto') abrirGasto(app);
+    else if (q === 'cierre') app.go('#/cierre');
     if (e.target.closest('[data-respaldo]')) respaldo();
   });
 }

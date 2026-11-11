@@ -6,8 +6,8 @@ import { sheet, confirmDialog, toast, field, moneyField, segHtml, segValue, swit
 import { getCliente, getPrestamo, addMov, addPrestamo } from '../store.js';
 import * as store from '../store.js';
 import { estadoBadge } from './prestamos.js';
-import { abrirFormCliente } from './clientes.js';
-import { drawCard, shareCardImage, textoEstadoCuenta, openWhatsApp } from '../card.js';
+import { abrirFormCliente, calificacionDe, calBadge } from './clientes.js';
+import { drawCard, shareCardImage, textoEstadoCuenta, textoRecordatorio, openWhatsApp } from '../card.js';
 
 const cfg = () => store.state.config;
 const refreshLuego = (app, fn) => afterLayers(() => (fn ? fn() : app.refresh()));
@@ -93,7 +93,8 @@ export function nuevo(app, _p, query) {
   main.innerHTML = `<form class="card" autocomplete="off">
       <div class="field"><label>Cliente</label>
         <div class="row"><select name="cliente" class="input grow">${opts(query.cliente)}</select>
-        <button type="button" class="btn sm" data-nuevo-cliente>${icon('userPlus', 'sm')} Nuevo</button></div></div>
+        <button type="button" class="btn sm" data-nuevo-cliente>${icon('userPlus', 'sm')} Nuevo</button></div>
+        <div data-cal class="small"></div></div>
       ${condicionesHtml(v)}
       ${field('Notas (opcional)', '<textarea name="notas" placeholder="Ej: fiador, acuerdo especial…"></textarea>')}
     </form>
@@ -105,10 +106,22 @@ export function nuevo(app, _p, query) {
   const res = $('[data-res]', main);
   const cond = bindCondiciones(form, { onChange: (x) => { res.innerHTML = x.capital > 0 ? resumenCondiciones(x) : '<div class="r muted small">Escribe el valor prestado para ver el resumen.</div>'; } });
   cond.recalc();
+  const mostrarCal = () => {
+    const id = form.cliente.value;
+    const box = $('[data-cal]', main);
+    if (!id) { box.innerHTML = ''; return; }
+    const cal = calificacionDe(app, id);
+    const deuda = store.prestamosDe(id).map((p) => calcular(p, today(), cfg())).filter((x) => x.activo).reduce((s, x) => s + x.saldo, 0);
+    box.innerHTML = `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:2px">${calBadge(cal)}${deuda > 0 ? `<span class="badge b-warn">Debe ${money(deuda)}</span>` : ''}</div>
+      ${cal.nivel === 'malo' || cal.nivel === 'regular' ? `<div class="muted" style="margin-top:6px">${esc(cal.motivos[0] || '')}</div>` : ''}`;
+  };
+  form.cliente.addEventListener('change', mostrarCal);
+  mostrarCal();
   $('[data-nuevo-cliente]', main).onclick = () => abrirFormCliente(app, null, (cl) => {
     clientes.push(cl);
     clientes.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     form.cliente.innerHTML = opts(cl.id);
+    mostrarCal();
   }, { stay: true });
   $('[data-guardar]', main).onclick = async () => {
     const x = cond.read();
@@ -160,7 +173,8 @@ export function detalle(app, id) {
     const n = Math.ceil(c.atraso / c.valorCuota);
     alertas += `<div class="alert ${c.diasMora >= cfg().alertaMora ? 'danger' : 'info'}">${icon('clock')}<div class="grow">
       <b>Debe ${money(c.atraso)}</b> <span class="small">(${n} cuota${n > 1 ? 's' : ''})</span>
-      <p style="margin-bottom:0">Atrasado desde el ${fdate(c.proxima)} · ${c.diasMora} día${c.diasMora > 1 ? 's' : ''} de mora.</p></div></div>`;
+      <p>Atrasado desde el ${fdate(c.proxima)} · ${c.diasMora} día${c.diasMora > 1 ? 's' : ''} de mora.</p>
+      <button class="btn sm" data-recordar>${icon('chat', 'sm')} Recordar por WhatsApp</button></div></div>`;
   }
   if (puedeEliminarCarton(c)) {
     alertas += `<div class="alert info">${icon('checkCircle')}<div class="grow"><b>Pagó todo · está en el historial</b>
@@ -248,6 +262,37 @@ export function detalle(app, id) {
   });
   $('[data-mas]', main.parentElement).onclick = () => abrirMas(app, p, c);
   $('[data-carton]', main)?.addEventListener('click', () => confirmarEliminarCarton(app, p, c));
+  $('[data-recordar]', main)?.addEventListener('click', () => abrirRecordatorio(p));
+}
+
+/** Recordatorio de cobro: muestra el mensaje para revisarlo o cambiarlo y lo abre en WhatsApp. */
+export function abrirRecordatorio(p) {
+  const d = datosTarjeta(p);
+  const texto = textoRecordatorio(d);
+  const tel = d.cliente?.telefono;
+  sheet({
+    title: 'Recordar pago',
+    ico: 'chat',
+    tone: 'tone-ok',
+    body: `<p class="small muted" style="margin-top:-6px">${esc(d.cliente?.nombre || '')}${tel ? ` · ${esc(tel)}` : ' · <b style="color:var(--warn)">sin teléfono registrado</b>'}</p>
+      ${field('Mensaje (puedes cambiarlo)', `<textarea name="msg" rows="7" style="min-height:160px">${esc(texto)}</textarea>`)}
+      <button class="btn primary block" data-enviar>${icon('chat', 'sm')} ${tel ? 'Enviar por WhatsApp' : 'Compartir mensaje'}</button>`,
+    onMount(el, api) {
+      $('[data-enviar]', el).onclick = async () => {
+        const msg = $('[name=msg]', el).value.trim();
+        if (tel) {
+          openWhatsApp(tel, msg, cfg().indicativo);
+          api.close();
+          return;
+        }
+        try {
+          if (navigator.share) await navigator.share({ text: msg });
+          else { await navigator.clipboard.writeText(msg); toast('Mensaje copiado'); }
+          api.close();
+        } catch { /* cancelado */ }
+      };
+    },
+  });
 }
 
 async function confirmarEliminarCarton(app, p, c) {

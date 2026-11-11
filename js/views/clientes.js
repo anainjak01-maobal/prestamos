@@ -1,7 +1,7 @@
 // Clientes: lista, detalle y formulario.
 import { icon } from '../icons.js';
 import { $, esc, money, norm, avatarTone, initials, today, waPhone } from '../utils.js';
-import { calcular } from '../logic.js';
+import { calcular, calificarCliente } from '../logic.js';
 import { sheet, toast, field, confirmDialog, emptyState, afterLayers } from '../ui.js';
 import * as store from '../store.js';
 import { itemPrestamo, bindLista, estadoBadge } from './prestamos.js';
@@ -10,12 +10,21 @@ let busqueda = '';
 
 const PRIORIDAD = { vencido: 5, atrasado: 4, hoy: 3, al_dia: 2, pagado: 1, anulado: 0 };
 
-function resumenCliente(cl, calcs) {
+function resumenCliente(cl, calcs, cfg = {}) {
   const mios = calcs.filter((c) => c.p.clienteId === cl.id);
   const activos = mios.filter((c) => c.activo);
   const peor = activos.sort((a, b) => PRIORIDAD[b.estado] - PRIORIDAD[a.estado] || b.diasMora - a.diasMora)[0];
-  return { mios, activos, saldo: activos.reduce((s, c) => s + c.saldo, 0), peor };
+  return { mios, activos, saldo: activos.reduce((s, c) => s + c.saldo, 0), peor, cal: calificarCliente(mios, cfg) };
 }
+
+/** Calificación de un cliente por su id (para otras pantallas). */
+export function calificacionDe(app, clienteId) {
+  const hoy = today();
+  const calcs = store.prestamosDe(clienteId).map((p) => calcular(p, hoy, app.state.config));
+  return calificarCliente(calcs, app.state.config, hoy);
+}
+
+export const calBadge = (cal) => `<span class="badge ${cal.cls}">${cal.emoji} ${esc(cal.txt)}</span>`;
 
 export function lista(app) {
   const hoy = today();
@@ -30,13 +39,13 @@ export function lista(app) {
     const q = norm(busqueda);
     const items = app.state.clientes
       .filter((c) => !q || [c.nombre, c.cedula, c.telefono, c.codigo, c.direccion].some((x) => norm(x).includes(q)))
-      .map((c) => ({ c, r: resumenCliente(c, calcs) }))
+      .map((c) => ({ c, r: resumenCliente(c, calcs, app.state.config) }))
       .sort((a, b) => (b.r.activos.length > 0) - (a.r.activos.length > 0) || a.c.nombre.localeCompare(b.c.nombre, 'es'));
     $('[data-list]', main).innerHTML = items.length
       ? `<p class="small muted" style="margin:0 4px 8px">${items.length} cliente${items.length > 1 ? 's' : ''}</p><div class="list">${items.map(({ c, r }) => `
         <div class="item" data-href="#/cliente/${c.id}">
           <div class="avatar ${avatarTone(c.nombre)}">${esc(initials(c.nombre))}</div>
-          <div class="grow"><div class="t ellipsis">${esc(c.nombre)}</div><div class="s ellipsis">${esc([c.codigo, c.telefono].filter(Boolean).join(' · ') || 'Sin teléfono')}</div></div>
+          <div class="grow"><div class="t ellipsis">${esc(c.nombre)}</div><div class="s ellipsis">${r.cal.emoji} ${esc(r.cal.txt)} · ${esc([c.codigo, c.telefono].filter(Boolean).join(' · ') || 'Sin teléfono')}</div></div>
           <div class="end">${r.activos.length ? `<span class="amt num">${money(r.saldo)}</span>${estadoBadge(r.peor)}` : '<span class="badge b-muted">Sin deuda</span>'}</div>
         </div>`).join('')}</div>`
       : app.state.clientes.length
@@ -57,7 +66,7 @@ export function detalle(app, id) {
   }
   const hoy = today();
   const calcs = store.prestamosDe(id).map((p) => calcular(p, hoy, app.state.config)).sort((a, b) => b.activo - a.activo || b.p.id - a.p.id);
-  const r = resumenCliente(cl, calcs);
+  const r = resumenCliente(cl, calcs, app.state.config);
   const pagado = calcs.reduce((s, c) => s + c.pagado, 0);
   const historial = calcs.filter((c) => !c.activo);
   const ganHist = historial.reduce((s, c) => s + c.gananciaCobrada, 0);
@@ -82,6 +91,10 @@ export function detalle(app, id) {
     <div class="kpis">
       <div class="kpi"><div class="ico tone-warn">${icon('wallet', 'sm')}</div><div class="v num">${money(r.saldo)}</div><div class="l">Debe ahora</div></div>
       <div class="kpi"><div class="ico tone-ok">${icon('cash', 'sm')}</div><div class="v num">${money(pagado)}</div><div class="l">Total pagado</div></div>
+    </div>
+    <div class="card">
+      <div class="row between"><h3 style="margin:0">Calificación</h3>${calBadge(r.cal)}</div>
+      <ul class="small muted" style="margin:10px 0 0;padding-left:18px">${r.cal.motivos.map((m) => `<li>${esc(m)}</li>`).join('') || '<li>Sin préstamos todavía.</li>'}</ul>
     </div>
     ${cl.notas ? `<div class="card"><h3>Notas</h3><p style="margin:0;white-space:pre-wrap">${esc(cl.notas)}</p></div>` : ''}
     <div class="section-title">Préstamos activos <span class="muted">${r.activos.length}</span></div>

@@ -207,7 +207,11 @@ export function resumenGeneral(state, hoy = today()) {
   const capitalBase = sum(state.socios, (s) => saldoSocio(s));
   const enCalle = sum(activos, (c) => c.capitalPendiente);
   const gananciaCobrada = sum(calcs, (c) => c.gananciaCobrada);
+  const gastos = sum((state.gastos || []).filter((g) => g.tipo !== 'retiro'), (g) => g.valor);
+  const retiros = sum((state.gastos || []).filter((g) => g.tipo === 'retiro'), (g) => g.valor);
   return {
+    gastos,
+    retiros,
     calcs,
     activos,
     porCobrar: sum(activos, (c) => c.saldo),
@@ -220,8 +224,84 @@ export function resumenGeneral(state, hoy = today()) {
     gananciaCobrada,
     gananciaPactada: sum(calcs, (c) => c.interesesPactados),
     capitalBase,
-    disponible: capitalBase + gananciaCobrada - enCalle,
+    disponible: capitalBase + gananciaCobrada - enCalle - gastos - retiros,
   };
+}
+
+// ---- Gastos y retiros de ganancia ----
+export const CATEGORIAS_GASTO = ['Transporte', 'Teléfono', 'Papelería', 'Comida', 'Otro'];
+
+/** Suma de gastos y de retiros por mes: { 'AAAA-MM': { gastos, retiros } } */
+export function gastosPorMes(state) {
+  const out = {};
+  for (const g of state.gastos || []) {
+    const k = monthKey(g.fecha);
+    out[k] ||= { gastos: 0, retiros: 0 };
+    out[k][g.tipo === 'retiro' ? 'retiros' : 'gastos'] += g.valor || 0;
+  }
+  return out;
+}
+
+/**
+ * Ganancia cobrada por mes: en cada préstamo los pagos cubren primero el capital y lo que pasa
+ * del capital es ganancia, en la fecha de ese pago.
+ */
+export function gananciaCobradaPorMes(state) {
+  const out = {};
+  for (const p of state.prestamos) {
+    if (p.estado === 'anulado') continue;
+    let acum = 0;
+    const pagos = (p.movs || []).filter((m) => m.tipo === 'pago' || m.tipo === 'renovacion').sort(ordenMovs);
+    for (const m of pagos) {
+      const antes = Math.max(0, acum - p.capital);
+      acum += m.valor || 0;
+      const g = Math.max(0, acum - p.capital) - antes;
+      if (g > 0) out[monthKey(m.fecha)] = (out[monthKey(m.fecha)] || 0) + g;
+    }
+  }
+  return out;
+}
+
+// ---- Calificación del cliente ----
+export const CALIFICACIONES = {
+  bueno: { txt: 'Buen pagador', emoji: '🟢', cls: 'b-ok' },
+  regular: { txt: 'Regular', emoji: '🟡', cls: 'b-warn' },
+  malo: { txt: 'Mal pagador', emoji: '🔴', cls: 'b-danger' },
+  nuevo: { txt: 'Sin historial', emoji: '⚪', cls: 'b-muted' },
+};
+
+/** Califica a un cliente con sus préstamos ya calculados. Devuelve nivel y motivos. */
+export function calificarCliente(calcs, cfg = {}, hoy = today()) {
+  const alerta = cfg.alertaMora || 5;
+  const motivos = [];
+  let nivel = 0; // 0 sin problemas, 2 regular, 3 malo
+  const subir = (n, motivo) => { nivel = Math.max(nivel, n); motivos.push(motivo); };
+  const validos = calcs.filter((c) => c.p.estado !== 'anulado');
+  let pagados = 0;
+  for (const c of validos) {
+    const id = `Préstamo #${c.p.id}`;
+    const adic = (c.p.movs || []).reduce((n, m) => (m.tipo === 'interes' ? n + (m.resumen ? m.adicionales || 0 : 1) : n), 0);
+    if (c.activo) {
+      const diasVencido = c.vencido ? diffDays(hoy, c.fechaFin) : 0;
+      if (c.diasMora >= 30 || diasVencido > 30) subir(3, `${id}: ${c.diasMora} días de mora${c.vencido ? ', plazo vencido' : ''}`);
+      else if (c.vencido) subir(2, `${id}: plazo vencido hace ${diasVencido} días`);
+      else if (c.diasMora >= alerta) subir(2, `${id}: ${c.diasMora} días de mora`);
+    } else if (c.estado === 'pagado') {
+      pagados++;
+      const fechas = (c.p.movs || []).filter((m) => m.tipo === 'pago' || m.tipo === 'renovacion').map((m) => m.fecha).sort();
+      const extra = fechas.length ? diffDays(fechas[fechas.length - 1], c.fechaFin) : 0;
+      if (extra > 15) subir(2, `${id}: terminó de pagar ${extra} días después del plazo`);
+      else if (extra > alerta) subir(2, `${id}: terminó ${extra} días tarde`);
+    }
+    if (adic >= 2) subir(3, `${id}: ${adic} intereses adicionales por atraso`);
+    else if (adic === 1) subir(2, `${id}: se le cobró interés adicional`);
+  }
+  // Varios préstamos terminados muy tarde también es mala señal
+  if (motivos.filter((m) => m.includes('días después del plazo')).length >= 2) nivel = 3;
+  let clave = nivel === 3 ? 'malo' : nivel === 2 ? 'regular' : pagados > 0 ? 'bueno' : 'nuevo';
+  if (clave === 'bueno') motivos.push(`Pagó ${pagados} préstamo${pagados > 1 ? 's' : ''} sin problemas`);
+  if (clave === 'nuevo' && validos.length) motivos.push('Aún no termina ningún préstamo; va al día');
+  return { nivel: clave, ...CALIFICACIONES[clave], motivos, pagados };
 }
 
 /** Ganancia pactada por mes (interés al prestar o renovar + intereses adicionales), como la hoja GANANCIAS. */
@@ -277,8 +357,10 @@ export function eliminarCarton(p, c, hoy = today()) {
   const extra = c.pagado - base;
   const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const movs = [];
-  if (extra > 0) movs.push({ id: id(), ts: 1, tipo: 'interes', fecha: fechaPago, valor: extra, nota: 'Intereses adicionales y renovaciones (resumen)' });
-  if (extra < 0) movs.push({ id: id(), ts: 1, tipo: 'ajuste', fecha: fechaPago, valor: extra, nota: 'Descuentos (resumen)' });
+  // Si el cartón tenía intereses adicionales, se conserva cuántos (para la calificación del cliente).
+  const adicionales = (p.movs || []).filter((m) => m.tipo === 'interes' && !m.resumen).length;
+  if (extra > 0) movs.push({ id: id(), ts: 1, tipo: 'interes', resumen: true, adicionales, fecha: fechaPago, valor: extra, nota: 'Intereses adicionales y renovaciones (resumen)' });
+  if (extra < 0) movs.push({ id: id(), ts: 1, tipo: 'ajuste', resumen: true, fecha: fechaPago, valor: extra, nota: 'Descuentos (resumen)' });
   movs.push({ id: id(), ts: 2, tipo: 'pago', fecha: fechaPago, valor: c.pagado, nota: 'Pagó todo (cartón eliminado)' });
   p.movs = movs;
   p.cartonEliminado = { fecha: hoy, movimientos: n };

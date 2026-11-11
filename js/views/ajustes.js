@@ -22,6 +22,8 @@ export function mas(app) {
   main.innerHTML = `
     <div class="list menu">
       <a class="item" href="#/capital"><span class="ico tone-violet">${icon('bank')}</span><span class="grow"><span class="t">Capital y socios</span><br><span class="s">Aportes, retiros y capital disponible</span></span>${icon('next', 'sm')}</a>
+      <a class="item" href="#/gastos"><span class="ico tone-warn">${icon('cash')}</span><span class="grow"><span class="t">Gastos y retiros</span><br><span class="s">Ganancia neta del mes</span></span>${icon('next', 'sm')}</a>
+      <a class="item" href="#/cierre"><span class="ico tone-ok">${icon('checkCircle')}</span><span class="grow"><span class="t">Cierre del día</span><br><span class="s">Cobrado, prestado y quién no pagó</span></span>${icon('next', 'sm')}</a>
       <a class="item" href="#/estadisticas"><span class="ico tone-info">${icon('chart')}</span><span class="grow"><span class="t">Estadísticas</span><br><span class="s">Gráficas, ganancias y proyecciones</span></span>${icon('next', 'sm')}</a>
     </div>
     <div class="section-title">Respaldo</div>

@@ -1,7 +1,7 @@
 // Estadísticas, gráficas y proyecciones.
 import { icon } from '../icons.js';
 import { esc, money, today, addDays, addMonths, monthKey, fmonth, parseYmd, diffDays, avatarTone, initials } from '../utils.js';
-import { resumenGeneral, gananciaPorMes, cobrosPorDia, prestadoPorMes, proyeccion } from '../logic.js';
+import { resumenGeneral, gananciaPorMes, cobrosPorDia, prestadoPorMes, proyeccion, gastosPorMes, gananciaCobradaPorMes } from '../logic.js';
 import { bars, donut } from '../charts.js';
 import { getCliente } from '../store.js';
 import { emptyState } from '../ui.js';
@@ -31,6 +31,10 @@ export function render(app) {
   const cobMes = {};
   for (const [d, v] of Object.entries(porDia)) cobMes[monthKey(d)] = (cobMes[monthKey(d)] || 0) + v;
   const mesActual = monthKey(hoy);
+  const gxm = gastosPorMes(s);
+  const gcm = gananciaCobradaPorMes(s);
+  const gMes = gxm[mesActual] || { gastos: 0, retiros: 0 };
+  const ganCobMes = gcm[mesActual] || 0;
 
   // Proyección 8 semanas
   const fin = addDays(hoy, 55);
@@ -68,6 +72,17 @@ export function render(app) {
       <div class="kpi"><div class="ico tone-info">${icon('target', 'sm')}</div><div class="v num">${money(prox30)}</div><div class="l">Por cobrar próximos 30 días</div></div>
     </div>
 
+    <div class="card"><h3>Resultado del mes</h3>
+      <dl class="kv">
+        <dt>Ganancia cobrada</dt><dd style="color:var(--ok)">${money(ganCobMes)}</dd>
+        <dt>Gastos</dt><dd style="color:var(--danger)">− ${money(gMes.gastos)}</dd>
+        <dt><b>Ganancia neta</b></dt><dd><b>${money(ganCobMes - gMes.gastos)}</b></dd>
+        <dt>Retiros de ganancia</dt><dd style="color:var(--violet)">− ${money(gMes.retiros)}</dd>
+        <dt>Queda en el negocio</dt><dd>${money(ganCobMes - gMes.gastos - gMes.retiros)}</dd>
+      </dl>
+      <a class="btn sm" href="#/gastos" style="margin-top:12px">${icon('cash', 'sm')} Ver gastos y retiros</a>
+    </div>
+
     <div class="card"><h3>Cobros · últimos 30 días</h3>
       <div class="row between small" style="margin-bottom:8px"><span class="muted">Últimos 7 días <b style="color:var(--text)">${money(total7)}</b></span><span class="muted">30 días <b style="color:var(--text)">${money(total30)}</b></span></div>
       ${bars({ labels: dias.map((d) => String(parseYmd(d).getDate())), series: [{ name: 'Cobrado', color: 'var(--primary)', values: cobros30 }], labelEvery: 5, highlightLast: true })}
@@ -84,6 +99,7 @@ export function render(app) {
         { name: 'Prestado', color: 'var(--text-3)', values: meses.map((m) => prest[m] || 0) },
         { name: 'Cobrado', color: 'var(--primary)', values: meses.map((m) => cobMes[m] || 0) },
         { name: 'Ganancia pactada', color: 'var(--violet)', values: meses.map((m) => gan[m] || 0) },
+        { name: 'Gastos', color: 'var(--danger)', values: meses.map((m) => gxm[m]?.gastos || 0) },
       ] })}
     </div>
 

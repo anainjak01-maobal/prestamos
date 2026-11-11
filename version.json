@@ -1,9 +1,11 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "fecha": "2026-11-11",
   "novedades": [
-    "Aviso cuando hay una versión nueva, con botón para actualizar al instante.",
-    "Las actualizaciones llegan apenas se publican (sin esperar 10 minutos).",
-    "Pantalla de novedades después de cada actualización."
+    "Gastos y retiros de ganancia (Más → Gastos y retiros): ahora ves la ganancia neta del mes y el disponible real.",
+    "Recordatorio de cobro por WhatsApp en los préstamos atrasados, con el mensaje listo para enviar.",
+    "Calificación de clientes: 🟢 buen pagador, 🟡 regular o 🔴 mal pagador, con el porqué. Sale también al crear un préstamo.",
+    "Cierre del día: cobrado, prestado, gastos, efectivo del día y quién no pagó. Se puede compartir.",
+    "En el inicio, accesos rápidos a Gasto y Cierre del día."
   ]
 }

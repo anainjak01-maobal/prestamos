@@ -20,7 +20,7 @@ export function lista(app) {
       <div class="big num">${money(r.capitalBase)}</div>
       <div class="split">
         <div><span>En la calle</span><b class="num">${money(r.enCalle)}</b><span>capital prestado</span></div>
-        <div><span>Disponible</span><b class="num">${money(r.disponible)}</b><span>base + ganancia − calle</span></div>
+        <div><span>Disponible</span><b class="num">${money(r.disponible)}</b><span>base + ganancia − calle − gastos</span></div>
       </div>
     </div>
     <div class="kpis">
@@ -34,7 +34,7 @@ export function lista(app) {
         <div class="grow"><div class="t ellipsis">${esc(so.nombre)}</div><div class="s">${n} movimiento${n === 1 ? '' : 's'}</div></div>
         <div class="end"><span class="amt num">${money(saldoSocio(so))}</span>${r.capitalBase > 0 ? `<span class="small muted">${Math.round((saldoSocio(so) / r.capitalBase) * 100)}%</span>` : ''}</div></div>`;
     }).join('')}</div>` : emptyState('bank', 'Sin socios registrados', 'Agrega a cada socio con su aporte de capital.')}
-    <p class="tiny muted" style="margin:6px 4px">El <b>disponible</b> es el capital de los socios más la ganancia ya cobrada, menos el capital que está prestado.</p>`;
+    <p class="tiny muted" style="margin:6px 4px">El <b>disponible</b> es el capital de los socios más la ganancia ya cobrada, menos el capital que está prestado y menos los gastos y retiros${r.gastos + r.retiros ? ` (${money(r.gastos + r.retiros)})` : ''}.</p>`;
   main.addEventListener('click', (e) => {
     const it = e.target.closest('[data-href]');
     if (it) app.go(it.dataset.href);

@@ -24,6 +24,7 @@ export function emptyState() {
     clientes: [],
     prestamos: [],
     socios: [],
+    gastos: [],            // { id, ts, fecha, tipo: 'gasto' | 'retiro', categoria, valor, nota }
   };
 }
 
@@ -33,6 +34,7 @@ function migrate(s) {
   s.clientes ||= [];
   s.prestamos ||= [];
   s.socios ||= [];
+  s.gastos ||= [];
   s.formato = FORMATO;
   return s;
 }

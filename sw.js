@@ -1,7 +1,7 @@
 // Service worker: permite instalar la app y usarla sin internet.
 // Estrategia: primero la red (para recibir siempre la última versión) y, sin conexión, la copia guardada.
 // Al cambiar archivos, subir la VERSION para limpiar la caché vieja.
-const VERSION = 'cobros-v3';
+const VERSION = 'cobros-v4';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -29,6 +29,8 @@ const ARCHIVOS = [
   './js/views/estadisticas.js',
   './js/views/capital.js',
   './js/views/ajustes.js',
+  './js/views/gastos.js',
+  './js/views/cierre.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',

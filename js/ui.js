@@ -148,8 +148,8 @@ export const field = (label, input, hint = '') =>
 export const moneyField = (name, label, value = '', hint = '', attrs = '') =>
   field(label, `<input class="money money-input" name="${name}" value="${value ? num(value) : ''}" placeholder="$ 0" ${attrs}>`, hint);
 
-export function segHtml(name, options, value) {
-  return `<div class="seg" data-seg="${name}" data-value="${esc(value)}">${options
+export function segHtml(name, options, value, cls = '') {
+  return `<div class="seg ${cls}" data-seg="${name}" data-value="${esc(value)}">${options
     .map((o) => `<button type="button" data-v="${esc(o)}" class="${o === value ? 'on' : ''}">${esc(o)}</button>`)
     .join('')}</div>`;
 }

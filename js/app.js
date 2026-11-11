@@ -11,6 +11,8 @@ import * as prestamo from './views/prestamo.js';
 import * as estadisticas from './views/estadisticas.js';
 import * as capital from './views/capital.js';
 import * as ajustes from './views/ajustes.js';
+import * as gastos from './views/gastos.js';
+import * as cierre from './views/cierre.js';
 import { buscarActualizacion, mostrarNovedadesSiCorresponde } from './update.js';
 
 const root = document.getElementById('app');
@@ -27,6 +29,8 @@ const routes = [
   [/^\/capital$/, capital.lista],
   [/^\/socio\/([^/]+)$/, capital.socio],
   [/^\/ajustes$/, ajustes.render],
+  [/^\/gastos$/, gastos.lista],
+  [/^\/cierre$/, cierre.render],
 ];
 
 const TABS = [

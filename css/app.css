@@ -220,6 +220,7 @@ main.view { flex: 1; padding: 4px 16px calc(var(--tabbar-h) + var(--safe-b) + 92
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface-2); border: 1px solid var(--border); border-radius: 13px; padding: 3px; gap: 3px; }
 .seg button { border: 0; background: transparent; border-radius: 10px; padding: 9px 4px; font-size: 13px; font-weight: 650; color: var(--text-2); cursor: pointer; }
 .seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.seg.wrap { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); }
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0 14px; }
 .switch-row .t { font-weight: 650; }
 .switch { position: relative; width: 50px; height: 30px; flex: none; }
