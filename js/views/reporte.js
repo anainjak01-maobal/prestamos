@@ -36,8 +36,20 @@ export function render(app, _p, query) {
     prestado: tot('prestado'), nNuevos: tot('nNuevos'), cobrado: tot('cobrado'),
     intereses: tot('intereses'), adicionales: tot('adicionales'), pactada: tot('pactada'),
     gastos: tot('gastos'), aRepartir: tot('aRepartir'), gananciaCobrada: tot('gananciaCobrada'), retiros: tot('retiros'),
-    terminados: tot('terminados'),
+    terminados: tot('terminados'), flujo: tot('flujo'),
   };
+  // Gastos por categoría en el rango
+  const cats = new Map();
+  for (const g of s.gastos || []) {
+    const m = monthKey(g.fecha);
+    if (g.tipo === 'retiro' || m < desde || m > hasta) continue;
+    const k = g.categoria || 'Otro';
+    const c = cats.get(k) || { cat: k, n: 0, valor: 0 };
+    c.n++; c.valor += g.valor || 0;
+    cats.set(k, c);
+  }
+  const gastosCat = [...cats.values()].sort((a, b) => b.valor - a.valor);
+  const rk = ultimo.riesgo;
   // Reparto acumulado por socio en el rango
   const porSocio = new Map();
   for (const i of infos) {
@@ -58,6 +70,7 @@ export function render(app, _p, query) {
 
   const main = app.shell({ title: 'Reporte PDF', back: '#/informe', tab: 'mas' });
   const n = (v) => `<td class="num">${money(v)}</td>`;
+  const f = (v) => `<td class="num ${v < 0 ? 'neg' : 'pos'}">${v > 0 ? '+' : ''}${money(v)}</td>`;
   main.innerHTML = `
     <div class="card no-print">
       <div class="grid2">
@@ -83,11 +96,18 @@ export function render(app, _p, query) {
 
       <h3>Mes por mes</h3>
       <div class="rep-tabla"><table>
-        <thead><tr><th>Mes</th><th>Prestado</th><th>Cobrado</th><th>Intereses</th><th>Adicionales</th><th>Gastos</th><th>Neta a repartir</th><th>Retiros</th></tr></thead>
-        <tbody>${infos.map((i) => `<tr><td>${esc(mesCorto(i.mes))}</td>${n(i.prestado)}${n(i.cobrado)}${n(i.intereses)}${n(i.adicionales)}${n(i.gastos)}<td class="num"><b>${money(i.aRepartir)}</b></td>${n(i.retiros)}</tr>`).join('')}</tbody>
-        <tfoot><tr><td>Total</td>${n(T.prestado)}${n(T.cobrado)}${n(T.intereses)}${n(T.adicionales)}${n(T.gastos)}${n(T.aRepartir)}${n(T.retiros)}</tr></tfoot>
+        <thead><tr><th>Mes</th><th>Prestado</th><th>Cobrado</th><th>Intereses</th><th>Adicionales</th><th>Gastos</th><th>Neta a repartir</th><th>Retiros</th><th>Flujo de caja</th></tr></thead>
+        <tbody>${infos.map((i) => `<tr><td>${esc(mesCorto(i.mes))}</td>${n(i.prestado)}${n(i.cobrado)}${n(i.intereses)}${n(i.adicionales)}${n(i.gastos)}<td class="num"><b>${money(i.aRepartir)}</b></td>${n(i.retiros)}${f(i.flujo)}</tr>`).join('')}</tbody>
+        <tfoot><tr><td>Total</td>${n(T.prestado)}${n(T.cobrado)}${n(T.intereses)}${n(T.adicionales)}${n(T.gastos)}${n(T.aRepartir)}${n(T.retiros)}${f(T.flujo)}</tr></tfoot>
       </table></div>
-      <p class="rep-nota">Neta a repartir = ganancia pactada (intereses de los préstamos del mes + adicionales) − gastos. Préstamos nuevos: ${T.nNuevos} · terminados: ${T.terminados} · ganancia ya cobrada en el rango: ${money(T.gananciaCobrada)}.</p>
+      <p class="rep-nota">Neta a repartir = ganancia pactada (intereses de los préstamos del mes + adicionales) − gastos. <b>Flujo de caja</b> = cobrado − prestado − gastos − retiros de ganancia: el efectivo que entró (+) o salió (−) de la caja. Préstamos nuevos: ${T.nNuevos} · terminados: ${T.terminados} · ganancia ya cobrada en el rango: ${money(T.gananciaCobrada)}.</p>
+
+      <h3>Gastos por categoría</h3>
+      ${gastosCat.length ? `<div class="rep-tabla"><table>
+        <thead><tr><th>Categoría</th><th>Cantidad</th><th>Total</th><th>%</th></tr></thead>
+        <tbody>${gastosCat.map((c) => `<tr><td>${esc(c.cat)}</td><td class="num">${c.n}</td>${n(c.valor)}<td class="num">${T.gastos ? pctTxt(c.valor / T.gastos) : '—'}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>Total</td><td class="num">${sum(gastosCat, (c) => c.n)}</td>${n(T.gastos)}<td></td></tr></tfoot>
+      </table></div>` : '<p class="rep-nota">No hubo gastos en este rango.</p>'}
 
       <h3>Reparto entre socios</h3>
       ${reparto.length ? `<div class="rep-tabla"><table>
@@ -97,6 +117,17 @@ export function render(app, _p, query) {
       </table></div>
       ${reparto.some((a) => a.notas.length) ? `<p class="rep-nota">Descuentos: ${reparto.filter((a) => a.notas.length).map((a) => `<b>${esc(a.socio.nombre)}</b> — ${esc(a.notas.join('; '))}`).join(' · ')}</p>` : ''}`
       : '<p class="rep-nota">No hay % de ganancia asignado a los socios (Capital y socios → socio → lápiz).</p>'}
+
+      <h3>Cartera en riesgo al ${esc(fdate(ultimo.corte))}</h3>
+      <div class="rep-tabla"><table>
+        <thead><tr><th>Estado</th><th>Préstamos</th><th>Atrasado</th><th>Saldo total</th></tr></thead>
+        <tbody>
+          <tr><td>Atrasados (dentro del plazo)</td><td class="num">${rk.nAtrasados}</td>${n(rk.atrasoAtrasados)}${n(rk.saldoAtrasados)}</tr>
+          <tr><td>Plazo vencido</td><td class="num">${rk.nVencidos}</td><td class="num">—</td>${n(rk.saldoVencidos)}</tr>
+        </tbody>
+        <tfoot><tr><td>En riesgo</td><td class="num">${rk.nAtrasados + rk.nVencidos} de ${rk.nActivos}</td><td></td><td class="num">${money(rk.saldoEnRiesgo)}</td></tr></tfoot>
+      </table></div>
+      <p class="rep-nota">${pctTxt(rk.pct)} del total por cobrar (${money(r.porCobrar)}) está atrasado o con el plazo vencido. Como se reparte la ganancia pactada, esta es la parte que todavía puede no entrar.</p>
 
       <h3>Estado al ${esc(fdate(ultimo.corte))}</h3>
       <dl class="rep-kv">

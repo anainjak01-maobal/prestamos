@@ -70,7 +70,9 @@ export function render(app, _p, query) {
         ${fila('Ganancia ya cobrada', money(i.gananciaCobrada), 'style="color:var(--ok)"')}
         ${fila('Retiros de ganancia', '− ' + money(i.retiros), 'style="color:var(--violet)"')}
         ${fila('Préstamos terminados', i.terminados)}
+        ${fila('<b>Flujo de caja</b>', `<b>${i.flujo > 0 ? '+' : ''}${money(i.flujo)}</b>`, `style="color:${i.flujo < 0 ? 'var(--danger)' : 'var(--ok)'}"`)}
       </dl>
+      <p class="tiny muted" style="margin:8px 0 0">Flujo de caja = cobrado − prestado − gastos − retiros: el efectivo que entró (+) o salió (−).</p>
     </div>
 
     <div class="card"><h3>Estado al ${esc(fdate(i.corte))}</h3>
@@ -81,6 +83,7 @@ export function render(app, _p, query) {
         ${fila('Disponible', money(r.disponible), 'style="color:var(--ok)"')}
         ${fila('Ganancia + adicionales', money(r.gananciaTotal))}
         ${fila('Ganancia + capital', money(r.gananciaMasCapital))}
+        ${fila(`En riesgo <span class="small muted">(${i.riesgo.nAtrasados} atrasados, ${i.riesgo.nVencidos} vencidos)</span>`, `${money(i.riesgo.saldoEnRiesgo)} <span class="small muted">${pctTxt(i.riesgo.pct)}</span>`, 'style="color:var(--warn)"')}
       </dl>
       <p class="tiny muted" style="margin:8px 0 0">Ganancias acumuladas desde el inicio. ${i.enCurso ? 'El mes no ha terminado: las cifras son a hoy.' : ''}</p>
     </div>
@@ -162,6 +165,7 @@ async function compartir(i, mes) {
     `Ganancia ya cobrada: ${money(i.gananciaCobrada)}`,
     `Retiros de ganancia: − ${money(i.retiros)}`,
     `Préstamos terminados: ${i.terminados}`,
+    `*Flujo de caja: ${i.flujo > 0 ? '+' : ''}${money(i.flujo)}* (cobrado − prestado − gastos − retiros)`,
     '',
     `*Estado al ${fdate(i.corte)}*`,
     `Capital base: ${money(r.capitalBase)}`,
@@ -170,6 +174,7 @@ async function compartir(i, mes) {
     `Disponible: ${money(r.disponible)}`,
     `Ganancia + adicionales (acumulada): ${money(r.gananciaTotal)}`,
     `Ganancia + capital: ${money(r.gananciaMasCapital)}`,
+    `En riesgo: ${money(i.riesgo.saldoEnRiesgo)} (${pctTxt(i.riesgo.pct)} de la deuda · ${i.riesgo.nAtrasados} atrasados, ${i.riesgo.nVencidos} con plazo vencido)`,
   );
   const guardan = i.socios.filter((x) => !x.participa && x.socio.pctGanancia !== undefined);
   if (guardan.length) {

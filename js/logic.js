@@ -452,12 +452,26 @@ export function informeMes(state, mes, hoy = today()) {
   });
   const sumaPct = Math.round(sum(socios, (x) => x.pct) * 1000) / 10;
 
+  // Cartera en riesgo al corte: atrasados y con plazo vencido (lo que se repartió como pactado y aún no entra).
+  const atr = r.activos.filter((c) => c.estado === 'atrasado');
+  const ven = r.activos.filter((c) => c.estado === 'vencido');
+  const riesgo = {
+    nAtrasados: atr.length, atrasoAtrasados: sum(atr, (c) => c.atraso), saldoAtrasados: sum(atr, (c) => c.saldo),
+    nVencidos: ven.length, saldoVencidos: sum(ven, (c) => c.saldo),
+    nActivos: r.activos.length,
+  };
+  riesgo.saldoEnRiesgo = riesgo.saldoAtrasados + riesgo.saldoVencidos;
+  riesgo.pct = r.porCobrar > 0 ? riesgo.saldoEnRiesgo / r.porCobrar : 0;
+
   return {
     mes, corte, finMes, enCurso: corte < finMes,
     prestado: sum(nuevos, (p) => p.capital), nNuevos: nuevos.length,
     cobrado, nPagos,
     pactada, intereses: pactada - adicionales, adicionales, nAdicionales,
     gananciaCobrada, gastos: gm.gastos, retiros: gm.retiros, gananciaNeta, aRepartir,
+    // Efectivo que entró (+) o salió (−) en el mes: cobrado − prestado − gastos − retiros de ganancia.
+    flujo: cobrado - sum(nuevos, (p) => p.capital) - gm.gastos - gm.retiros,
+    riesgo,
     terminados: terminados.length,
     r, socios, sumaPct, repartoConfigurado: socios.some((x) => x.participa),
   };

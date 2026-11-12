@@ -383,6 +383,8 @@ main.view { flex: 1; padding: 4px 16px calc(var(--tabbar-h) + var(--safe-b) + 92
 .reporte td { padding: 5px; border-bottom: 1px solid #e6e9ed; text-align: right; white-space: nowrap; }
 .reporte th:first-child, .reporte td:first-child { text-align: left; }
 .reporte tfoot td { font-weight: 750; border-top: 2px solid #1a1d21; border-bottom: 0; background: #f7f9fa; }
+.reporte td.neg { color: #b42318; }
+.reporte td.pos { color: #067647; }
 .rep-nota { font-size: 11px; color: #6b7480; margin: 6px 0 0; }
 .rep-kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; margin: 0; }
 .rep-kv dt { color: #4a525c; }

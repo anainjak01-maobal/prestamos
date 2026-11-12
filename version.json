@@ -1,8 +1,10 @@
 {
-  "version": "1.8.0",
+  "version": "1.9.0",
   "fecha": "2026-11-12",
   "novedades": [
-    "Reporte PDF por rango de meses (Informe para socios → Reporte PDF): tabla mes por mes con totales, reparto entre socios con descuentos y estado al final del rango.",
-    "Toca «Guardar PDF» y en la ventana de imprimir elige «Guardar como PDF» para compartirlo por WhatsApp o guardarlo en Drive."
+    "Flujo de caja por mes (cobrado − prestado − gastos − retiros): el efectivo que entró o salió, para cuadrar con la caja.",
+    "Cartera en riesgo: cuánto está atrasado o con el plazo vencido, y qué % de la deuda representa.",
+    "El reporte PDF trae además los gastos por categoría del rango.",
+    "Flujo de caja y cartera en riesgo también aparecen en el Informe para socios y en el texto que se comparte."
   ]
 }
