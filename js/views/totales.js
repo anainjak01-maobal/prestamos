@@ -15,7 +15,7 @@ export function tarjetaTotales(r) {
       <dt>Capital base</dt><dd>${money(r.capitalBase)}</dd>
       <dt><b>Ganancia + capital</b></dt><dd style="color:var(--violet)"><b>${money(r.gananciaMasCapital)}</b></dd>
     </dl>
-    ${r.adicionalesAnteriores ? `<p class="tiny muted" style="margin:8px 0 0">Adicionales incluye ${money(r.adicionalesAnteriores)} anteriores (del Excel).</p>` : ''}
+    ${r.adicionalesAnteriores ? `<p class="tiny muted" style="margin:8px 0 0">Adicionales incluye ${money(r.adicionalesAnteriores)} anteriores del Excel, ya cobrados (también suman en la ganancia cobrada y en el disponible).</p>` : ''}
   </div>`;
 }
 
@@ -27,7 +27,7 @@ export function bindTotales(main, app) {
       title: 'Adicionales anteriores',
       ico: 'percent',
       tone: 'tone-violet',
-      body: `<p class="small muted" style="margin-top:-6px">Los adicionales que se registran en cada préstamo se suman solos. Aquí puedes poner el total de adicionales anteriores que no están en ningún préstamo (por ejemplo, la columna ADICIONALES de la hoja GANANCIAS del Excel).</p>
+      body: `<p class="small muted" style="margin-top:-6px">Los adicionales que se registran en cada préstamo se suman solos. Aquí va el total de adicionales anteriores que ya te pagaron y que no están en ningún préstamo (la columna ADICIONALES de la hoja GANANCIAS del Excel). Se suman a las ganancias, a la ganancia cobrada y al disponible.</p>
         ${moneyField('valor', 'Total de adicionales anteriores', actual || '', 'Déjalo en 0 si no hay.')}
         <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar</button>`,
       onMount(el, api) {

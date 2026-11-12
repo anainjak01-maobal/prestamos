@@ -206,7 +206,6 @@ export function resumenGeneral(state, hoy = today()) {
   }
   const capitalBase = sum(state.socios, (s) => saldoSocio(s));
   const enCalle = sum(activos, (c) => c.capitalPendiente);
-  const gananciaCobrada = sum(calcs, (c) => c.gananciaCobrada);
   const gastos = sum((state.gastos || []).filter((g) => g.tipo !== 'retiro'), (g) => g.valor);
   const retiros = sum((state.gastos || []).filter((g) => g.tipo === 'retiro'), (g) => g.valor);
   // Como la hoja GANANCIAS del Excel: intereses de cada préstamo + adicionales.
@@ -214,6 +213,8 @@ export function resumenGeneral(state, hoy = today()) {
   const interesesPrestamos = sum(vigentes, (c) => sum(c.ciclos, (x) => x.interes));
   const adicionalesAnteriores = Math.round(Number(state.config?.adicionalesAnteriores) || 0);
   const adicionales = sum(vigentes, (c) => c.adicionales) + adicionalesAnteriores;
+  // Los adicionales anteriores (del Excel) ya se cobraron: cuentan como ganancia cobrada y entran al disponible.
+  const gananciaCobrada = sum(calcs, (c) => c.gananciaCobrada) + adicionalesAnteriores;
   return {
     interesesPrestamos,
     adicionales,

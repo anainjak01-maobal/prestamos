@@ -1,7 +1,8 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "fecha": "2026-11-12",
   "novedades": [
+    "Los adicionales anteriores del Excel (lápiz junto a «Adicionales») ahora también suman en la ganancia cobrada y en el disponible, porque ya están pagados.",
     "Nueva tarjeta «Totales generales» en Inicio y en Gráficas, como en el Excel: total deuda por cobrar, ganancias (intereses), adicionales, ganancia + adicionales, capital base y ganancia + capital.",
     "Con el lápiz junto a «Adicionales» puedes poner los adicionales anteriores del Excel (los que no están en ningún préstamo)."
   ]
