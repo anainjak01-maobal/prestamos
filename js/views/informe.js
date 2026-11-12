@@ -44,7 +44,10 @@ export function render(app, _p, query) {
         <div><span>Gastos</span><b class="num">− ${money(i.gastos)}</b><span>del mes</span></div>
       </div>
     </div>
-    <button class="btn primary block" data-compartir style="margin-bottom:14px">${icon('share', 'sm')} Compartir informe con los socios</button>
+    <div class="btn-row" style="margin-bottom:14px">
+      <button class="btn primary" data-compartir>${icon('share', 'sm')} Compartir</button>
+      <a class="btn" href="#/reporte?desde=${mes.slice(0, 4)}-01&hasta=${mes}">${icon('download', 'sm')} Reporte PDF</a>
+    </div>
 
     <div class="section-title">Reparto de la ganancia</div>
     ${!i.repartoConfigurado

@@ -15,6 +15,7 @@ import * as gastos from './views/gastos.js';
 import * as cierre from './views/cierre.js';
 import * as adicionales from './views/adicionales.js';
 import * as informe from './views/informe.js';
+import * as reporte from './views/reporte.js';
 import { buscarActualizacion, mostrarNovedadesSiCorresponde } from './update.js';
 
 const root = document.getElementById('app');
@@ -35,6 +36,7 @@ const routes = [
   [/^\/cierre$/, cierre.render],
   [/^\/adicionales$/, adicionales.render],
   [/^\/informe$/, informe.render],
+  [/^\/reporte$/, reporte.render],
 ];
 
 const TABS = [

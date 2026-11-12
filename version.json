@@ -1,10 +1,8 @@
 {
-  "version": "1.7.0",
+  "version": "1.8.0",
   "fecha": "2026-11-12",
   "novedades": [
-    "Cada socio tiene ahora su % de la ganancia (Capital y socios → socio → lápiz). Pon 0 a quien solo dejó dinero guardado.",
-    "El informe para socios reparte la ganancia pactada del mes menos los gastos, según el % de cada socio.",
-    "En el informe puedes descontarle a un socio lo que deba al negocio ese mes: toca su nombre en el reparto.",
-    "Quien solo guarda dinero aparece aparte, sin ganancia."
+    "Reporte PDF por rango de meses (Informe para socios → Reporte PDF): tabla mes por mes con totales, reparto entre socios con descuentos y estado al final del rango.",
+    "Toca «Guardar PDF» y en la ventana de imprimir elige «Guardar como PDF» para compartirlo por WhatsApp o guardarlo en Drive."
   ]
 }
