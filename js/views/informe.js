@@ -23,7 +23,7 @@ export function render(app, _p, query) {
   const itemSocio = (x) => `<div class="item" data-desc="${x.socio.id}">
       <div class="avatar ${avatarTone(x.socio.nombre)}">${esc(initials(x.socio.nombre))}</div>
       <div class="grow"><div class="t ellipsis">${esc(x.socio.nombre)} · ${pctTxt(x.pct)}</div>
-        <div class="s">Ganancia ${money(x.parteGanancia)}${x.descuento ? ` · deuda − ${money(x.descuento)}` : ' · toca para descontar deuda'}</div></div>
+        <div class="s">Ganancia ${money(x.parteGanancia)}${x.retirosGanancia ? ` · retiró − ${money(x.retirosGanancia)}` : ''}${x.descuento ? ` · deuda − ${money(x.descuento)}` : ' · toca para descontar deuda'}</div></div>
       <div class="end"><span class="amt num" style="color:${x.aRecibir < 0 ? 'var(--danger)' : 'var(--ok)'}">${money(x.aRecibir)}</span><span class="small muted">a recibir</span></div></div>`;
 
   main.innerHTML = `
@@ -56,7 +56,8 @@ export function render(app, _p, query) {
           <a class="btn sm" href="#/capital">${icon('bank', 'sm')} Ir a Capital y socios</a></div></div>`
       : `${i.sumaPct !== 100 ? `<div class="alert warn">${icon('alert')}<div class="grow small">Los % de los socios suman ${String(i.sumaPct).replace('.', ',')} %, no 100 %. Revísalos en Capital y socios.</div></div>` : ''}
         <div class="list">${participan.map(itemSocio).join('')}</div>
-        <p class="tiny muted" style="margin:6px 4px 14px">Se reparte la ganancia <b>pactada</b> del mes menos los gastos. Toca un socio para descontarle lo que deba al negocio este mes.</p>`}
+        ${i.retirosSinSocio ? `<div class="alert warn" style="margin-top:8px">${icon('alert')}<div class="grow small">Hay ${money(i.retirosSinSocio)} en retiros de ganancia de este mes <b>sin socio asignado</b>. Ábrelos en Más → Gastos y retiros y elige quién los sacó.</div></div>` : ''}
+        <p class="tiny muted" style="margin:6px 4px 14px">Se reparte la ganancia <b>pactada</b> del mes menos los gastos. A cada socio se le restan sus retiros de ganancia del mes y lo que deba al negocio (toca su nombre).</p>`}
 
     <div class="card"><h3>Movimiento del mes</h3>
       <dl class="kv">
@@ -114,6 +115,7 @@ function abrirDescuento(app, x, mes) {
     tone: 'tone-warn',
     body: `<div class="summary">
         <div class="r"><span>Ganancia de ${esc(nombreMes(mes).toLowerCase())}</span><b>${money(x.parteGanancia)}</b></div>
+        ${x.retirosGanancia ? `<div class="r"><span>Retiros de ganancia del mes</span><b>− ${money(x.retirosGanancia)}</b></div>` : ''}
       </div>
       ${moneyField('valor', 'Valor que debe y se le descuenta', actual?.valor || '', 'Déjalo vacío o en 0 si no debe nada este mes.')}
       ${field('Nota', `<input name="nota" value="${esc(actual?.nota || '')}" placeholder="Ej: préstamo del 24/06 (cuaderno)">`)}
@@ -123,7 +125,8 @@ function abrirDescuento(app, x, mes) {
       const inp = $('[name=valor]', el);
       const upd = () => {
         const v = parseMoney(inp.value) || 0;
-        $('[data-res]', el).innerHTML = `<div class="r total"><span>Le queda por recibir</span><b style="color:${x.parteGanancia - v < 0 ? 'var(--danger)' : 'inherit'}">${money(x.parteGanancia - v)}</b></div>`;
+        const queda = x.parteGanancia - x.retirosGanancia - v;
+        $('[data-res]', el).innerHTML = `<div class="r total"><span>Le queda por recibir</span><b style="color:${queda < 0 ? 'var(--danger)' : 'inherit'}">${money(queda)}</b></div>`;
       };
       inp.addEventListener('input', upd);
       upd();
@@ -154,7 +157,8 @@ async function compartir(i, mes) {
   if (participan.length) {
     t.push('', '*Reparto*');
     participan.forEach((x) => {
-      t.push(`• ${x.socio.nombre} (${pctTxt(x.pct)}): ${money(x.parteGanancia)}${x.descuento ? ` − deuda ${money(x.descuento)}${x.notaDescuento ? ` (${x.notaDescuento})` : ''} = *${money(x.aRecibir)}*` : ''}`);
+      const restas = [x.retirosGanancia ? ` − retiros ${money(x.retirosGanancia)}` : '', x.descuento ? ` − deuda ${money(x.descuento)}${x.notaDescuento ? ` (${x.notaDescuento})` : ''}` : ''].join('');
+      t.push(`• ${x.socio.nombre} (${pctTxt(x.pct)}): ${money(x.parteGanancia)}${restas ? `${restas} = *${money(x.aRecibir)}*` : ''}`);
     });
   }
   t.push(

@@ -1,10 +1,9 @@
 {
-  "version": "1.9.0",
+  "version": "1.10.0",
   "fecha": "2026-11-12",
   "novedades": [
-    "Flujo de caja por mes (cobrado − prestado − gastos − retiros): el efectivo que entró o salió, para cuadrar con la caja.",
-    "Cartera en riesgo: cuánto está atrasado o con el plazo vencido, y qué % de la deuda representa.",
-    "El reporte PDF trae además los gastos por categoría del rango.",
-    "Flujo de caja y cartera en riesgo también aparecen en el Informe para socios y en el texto que se comparte."
+    "Al registrar un retiro de ganancia ahora eliges quién saca el dinero.",
+    "Ese retiro se le descuenta al socio en el reparto: ganancia − retiros − deuda = a recibir (en el informe, en el PDF y en el texto que se comparte).",
+    "Si hay retiros sin socio asignado, el informe te avisa para que los corrijas en Más → Gastos y retiros."
   ]
 }

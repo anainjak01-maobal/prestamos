@@ -55,8 +55,9 @@ export function render(app, _p, query) {
   for (const i of infos) {
     for (const x of i.socios) {
       if (!x.participa) continue;
-      const a = porSocio.get(x.socio.id) || { socio: x.socio, pct: x.pct, ganancia: 0, descuento: 0, notas: [] };
+      const a = porSocio.get(x.socio.id) || { socio: x.socio, pct: x.pct, ganancia: 0, retiros: 0, descuento: 0, notas: [] };
       a.ganancia += x.parteGanancia;
+      a.retiros += x.retirosGanancia;
       a.descuento += x.descuento;
       if (x.descuento) a.notas.push(`${mesCorto(i.mes)}: ${money(x.descuento)}${x.notaDescuento ? ` (${x.notaDescuento})` : ''}`);
       a.pct = x.pct;
@@ -64,6 +65,9 @@ export function render(app, _p, query) {
     }
   }
   const reparto = [...porSocio.values()];
+  const retirosSinSocio = sum(infos, (i) => i.retirosSinSocio);
+  const neto = (a) => a.ganancia - a.retiros - a.descuento;
+  const menos = (v) => `<td class="num">${v ? '− ' + money(v) : '—'}</td>`;
   const guardan = ultimo.socios.filter((x) => !x.participa && x.socio.pctGanancia !== undefined);
   const rango = desde === hasta ? nombreMes(desde) : `${nombreMes(desde)} a ${nombreMes(hasta)}`;
   const negocio = s.config.negocio || 'Control de Cobros';
@@ -111,10 +115,11 @@ export function render(app, _p, query) {
 
       <h3>Reparto entre socios</h3>
       ${reparto.length ? `<div class="rep-tabla"><table>
-        <thead><tr><th>Socio</th><th>%</th><th>Ganancia</th><th>Descuentos por deuda</th><th>A recibir</th></tr></thead>
-        <tbody>${reparto.map((a) => `<tr><td>${esc(a.socio.nombre)}</td><td class="num">${pctTxt(a.pct)}</td>${n(a.ganancia)}<td class="num">${a.descuento ? '− ' + money(a.descuento) : '—'}</td><td class="num"><b>${money(a.ganancia - a.descuento)}</b></td></tr>`).join('')}</tbody>
-        <tfoot><tr><td>Total</td><td></td>${n(sum(reparto, (a) => a.ganancia))}<td class="num">${sum(reparto, (a) => a.descuento) ? '− ' + money(sum(reparto, (a) => a.descuento)) : '—'}</td>${n(sum(reparto, (a) => a.ganancia - a.descuento))}</tr></tfoot>
+        <thead><tr><th>Socio</th><th>%</th><th>Ganancia</th><th>Retiros</th><th>Deuda</th><th>A recibir</th></tr></thead>
+        <tbody>${reparto.map((a) => `<tr><td>${esc(a.socio.nombre)}</td><td class="num">${pctTxt(a.pct)}</td>${n(a.ganancia)}${menos(a.retiros)}${menos(a.descuento)}<td class="num ${neto(a) < 0 ? 'neg' : ''}"><b>${money(neto(a))}</b></td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>Total</td><td></td>${n(sum(reparto, (a) => a.ganancia))}${menos(sum(reparto, (a) => a.retiros))}${menos(sum(reparto, (a) => a.descuento))}${n(sum(reparto, neto))}</tr></tfoot>
       </table></div>
+      <p class="rep-nota">A recibir = ganancia − retiros de ganancia que ya sacó − deuda con el negocio. Si sale negativo, el socio ya retiró más de lo que le tocaba.${retirosSinSocio ? ` <b>Hay ${money(retirosSinSocio)} en retiros sin socio asignado</b> (no se le descuentan a nadie).` : ''}</p>
       ${reparto.some((a) => a.notas.length) ? `<p class="rep-nota">Descuentos: ${reparto.filter((a) => a.notas.length).map((a) => `<b>${esc(a.socio.nombre)}</b> — ${esc(a.notas.join('; '))}`).join(' · ')}</p>` : ''}`
       : '<p class="rep-nota">No hay % de ganancia asignado a los socios (Capital y socios → socio → lápiz).</p>'}
 

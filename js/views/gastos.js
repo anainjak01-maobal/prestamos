@@ -44,12 +44,12 @@ export function lista(app, _p, query) {
     ${items.length ? `<div class="list">${items.map((g) => `
       <div class="item" data-id="${g.id}">
         <div class="avatar ${g.tipo === 'retiro' ? 'tone-violet' : 'tone-warn'}">${icon(g.tipo === 'retiro' ? 'arrowOut' : ICONO_CAT[g.categoria] || 'sliders', 'sm')}</div>
-        <div class="grow"><div class="t ellipsis">${esc(g.tipo === 'retiro' ? 'Retiro de ganancia' : g.categoria || 'Gasto')}</div>
+        <div class="grow"><div class="t ellipsis">${esc(g.tipo === 'retiro' ? `Retiro de ganancia${g.socioId ? ' · ' + (s.socios.find((so) => so.id === g.socioId)?.nombre || '') : ''}` : g.categoria || 'Gasto')}</div>
           <div class="s ellipsis">${fdate(g.fecha)}${g.nota ? ' · ' + esc(g.nota) : ''}</div></div>
         <div class="end"><span class="amt num" style="color:${g.tipo === 'retiro' ? 'var(--violet)' : 'var(--danger)'}">− ${money(g.valor)}</span></div>
       </div>`).join('')}</div>`
       : emptyState('cash', 'Sin gastos este mes', 'Registra gasolina, recargas, papelería o lo que retiras de la ganancia.')}
-    <p class="tiny muted" style="margin:6px 4px">Los <b>gastos</b> se restan de la ganancia. Los <b>retiros</b> son lo que sacas para ti: no son pérdida, pero se descuentan del dinero disponible.</p>`;
+    <p class="tiny muted" style="margin:6px 4px">Los <b>gastos</b> se restan de la ganancia. Los <b>retiros</b> son lo que saca un socio de su ganancia: no son pérdida, se descuentan del disponible y de lo que le toca a ese socio en el reparto.</p>`;
   main.addEventListener('click', (e) => {
     const mes = e.target.closest('[data-mes]');
     if (mes) { mesActual = mes.dataset.mes; return app.refresh(); }
@@ -66,6 +66,10 @@ export function abrirGasto(app, g = null, { tipo: tipoInicial = 'gasto' } = {}) 
     ico: 'cash',
     tone: 'tone-warn',
     body: `<div class="field"><span class="lbl">Tipo</span>${segHtml('tipo', ['Gasto', 'Retiro de ganancia'], tipo0 === 'retiro' ? 'Retiro de ganancia' : 'Gasto')}</div>
+      <div class="field" data-socio><label>¿Quién lo saca?</label><select name="socio"><option value="">— Sin asignar —</option>${app.state.socios
+        .slice().sort((a, b) => (b.pctGanancia > 0) - (a.pctGanancia > 0) || a.nombre.localeCompare(b.nombre))
+        .map((so) => `<option value="${so.id}" ${g?.socioId === so.id ? 'selected' : ''}>${esc(so.nombre)}${so.pctGanancia > 0 ? '' : ' (sin ganancia)'}</option>`).join('')}</select>
+        <div class="hint">Se le descuenta a ese socio en el reparto de la ganancia del mes.</div></div>
       <div class="field" data-cat><span class="lbl">Categoría</span>${segHtml('categoria', CATEGORIAS_GASTO, g?.categoria || 'Transporte', 'wrap')}</div>
       ${moneyField('valor', 'Valor', g?.valor || '')}
       ${field('Fecha', `<input type="date" name="fecha" value="${g?.fecha || today()}">`)}
@@ -74,14 +78,22 @@ export function abrirGasto(app, g = null, { tipo: tipoInicial = 'gasto' } = {}) 
       ${g ? `<div style="height:10px"></div><button class="btn danger block" data-del>${icon('trash', 'sm')} Eliminar</button>` : ''}`,
     onMount(el, api) {
       const cat = $('[data-cat]', el);
-      const syncCat = () => cat.classList.toggle('hidden', segValue(el, 'tipo') !== 'Gasto');
+      const soc = $('[data-socio]', el);
+      const syncCat = () => {
+        const gasto = segValue(el, 'tipo') === 'Gasto';
+        cat.classList.toggle('hidden', !gasto);
+        soc.classList.toggle('hidden', gasto);
+      };
       $('[data-seg=tipo]', el).addEventListener('change', syncCat);
       syncCat();
       $('[data-ok]', el).onclick = async () => {
         const valor = parseMoney($('[name=valor]', el).value);
         if (!(valor > 0)) return toast('Escribe el valor', 'err');
         const esRetiro = segValue(el, 'tipo') !== 'Gasto';
+        const socioId = esRetiro ? $('[name=socio]', el).value || null : null;
+        if (esRetiro && !socioId && app.state.socios.some((so) => so.pctGanancia > 0)) return toast('Elige quién saca el dinero', 'err');
         const datos = {
+          socioId,
           tipo: esRetiro ? 'retiro' : 'gasto',
           categoria: esRetiro ? '' : segValue(el, 'categoria'),
           valor,

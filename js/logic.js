@@ -436,6 +436,9 @@ export function informeMes(state, mes, hoy = today()) {
   const r = resumenGeneral(snap, corte);
 
   const original = new Map(state.socios.map((s) => [s.id, s]));
+  // Retiros de ganancia del mes: cada uno se le descuenta al socio que lo sacó.
+  const retirosMes = (state.gastos || []).filter((g) => g.tipo === 'retiro' && enMes(g.fecha));
+  const retirosSinSocio = sum(retirosMes.filter((g) => !g.socioId || !original.has(g.socioId)), (g) => g.valor);
   const socios = snap.socios.map((s) => {
     const base = saldoSocio(s);
     const pct = Math.max(0, Number(s.pctGanancia) || 0) / 100;
@@ -443,11 +446,13 @@ export function informeMes(state, mes, hoy = today()) {
     const desc = original.get(s.id)?.descuentos?.[mes] || null;
     const parteGanancia = Math.round(aRepartir * pct);
     const descuento = Math.round(Number(desc?.valor) || 0);
+    const retirosGanancia = sum(retirosMes.filter((g) => g.socioId === s.id), (g) => g.valor);
     return {
       socio: original.get(s.id) || s, base, pct, participa: pct > 0,
       aportes: sum(delMes.filter((m) => m.tipo !== 'retiro'), (m) => m.valor),
       retiros: sum(delMes.filter((m) => m.tipo === 'retiro'), (m) => m.valor),
-      parteGanancia, descuento, notaDescuento: desc?.nota || '', aRecibir: parteGanancia - descuento,
+      parteGanancia, descuento, notaDescuento: desc?.nota || '', retirosGanancia,
+      aRecibir: parteGanancia - descuento - retirosGanancia,
     };
   });
   const sumaPct = Math.round(sum(socios, (x) => x.pct) * 1000) / 10;
@@ -473,6 +478,6 @@ export function informeMes(state, mes, hoy = today()) {
     flujo: cobrado - sum(nuevos, (p) => p.capital) - gm.gastos - gm.retiros,
     riesgo,
     terminados: terminados.length,
-    r, socios, sumaPct, repartoConfigurado: socios.some((x) => x.participa),
+    r, socios, sumaPct, repartoConfigurado: socios.some((x) => x.participa), retirosSinSocio,
   };
 }
