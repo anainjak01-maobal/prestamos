@@ -15,9 +15,10 @@ const refreshLuego = (app, fn) => afterLayers(() => (fn ? fn() : app.refresh()))
 // =====================================================================
 // Formulario de condiciones (nuevo préstamo, editar, renovación)
 // =====================================================================
-function condicionesHtml(v, { conCapital = true, labelFecha = 'Fecha del préstamo', conFecha = true } = {}) {
+function condicionesHtml(v, { conCapital = true, labelFecha = 'Fecha del préstamo', conFecha = true, despuesFecha = '' } = {}) {
   return `
     ${conFecha ? field(labelFecha, `<input type="date" name="fecha" value="${esc(v.fecha)}" required>`) : ''}
+    ${despuesFecha}
     ${conCapital ? moneyField('capital', 'Valor prestado (capital)', v.capital) : ''}
     <div class="field"><span class="lbl">Modalidad de pago</span>${segHtml('modalidad', MODALIDADES, v.modalidad)}</div>
     <div class="grid2">
@@ -569,6 +570,13 @@ export function abrirRenovacion(app, p) {
   const ci = c.ciclo;
   const interesSug = Math.min(c.saldo, ci.interes + Math.max(0, ci.extra));
   const v0 = { fecha: today(), modalidad: ci.modalidad, tasa: ci.tasa, nCuotas: ci.nCuotas, valorCuota: '', cobraDomingos: ci.cobraDomingos };
+  // Fecha fija: si paga en el último periodo o después, el nuevo periodo cuenta desde el fin del plazo
+  // (así no se corre la fecha aunque pague tarde o temprano). Si renueva antes, cuenta desde el pago.
+  const fp = c.fechasPlan;
+  const desdeUltimo = fp.length > 1 ? fp[fp.length - 2] : ci.inicio;
+  const inicioSugerido = (fechaPago) => (fechaPago >= desdeUltimo ? c.fechaFin : fechaPago);
+  const campoInicio = field('El nuevo periodo cuenta desde', `<input type="date" name="inicio" value="${inicioSugerido(v0.fecha)}">`,
+    `Fin del plazo actual: ${fdate(c.fechaFin)}. Así la fecha de cobro no se corre si paga unos días tarde o antes.`);
   sheet({
     title: 'Interés + abono a capital',
     ico: 'refresh',
@@ -580,13 +588,14 @@ export function abrirRenovacion(app, p) {
         ${moneyField('abonoCapital', 'Abono a capital', '')}
       </div>
       <h3 style="font-size:13px;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin:4px 0 12px">Nuevas condiciones</h3>
-      ${condicionesHtml(v0, { conCapital: false, labelFecha: 'Fecha del pago' })}
+      ${condicionesHtml(v0, { conCapital: false, labelFecha: 'Fecha del pago', despuesFecha: campoInicio })}
       <div class="summary" data-res></div>
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar y recalcular</button>`,
     onMount(el, api) {
       const q = (n) => $(`[name=${n}]`, el);
       const pago = () => parseMoney(q('interesPagado').value) + parseMoney(q('abonoCapital').value);
       const nuevoCap = () => c.saldo - pago();
+      const inicio = () => q('inicio').value || q('fecha').value || today();
       const res = $('[data-res]', el);
       const cond = bindCondiciones(el, {
         getCapital: () => Math.max(0, nuevoCap()),
@@ -595,9 +604,13 @@ export function abrirRenovacion(app, p) {
           res.innerHTML = nc <= 0
             ? `<div class="r" style="color:var(--warn)"><span>Con ese pago queda a paz y salvo. Usa “Cobrar”.</span></div>`
             : `<div class="r"><span>Paga hoy</span><b style="color:var(--ok)">${money(pago())}</b></div>
-               <div class="r"><span>Nuevo capital</span><b>${money(nc)}</b></div>${resumenCondiciones(x, nc).replace(/<div class="r"><span>Capital<\/span>.*?<\/div>/, '')}`;
+               <div class="r"><span>Nuevo capital</span><b>${money(nc)}</b></div>${resumenCondiciones({ ...x, fecha: inicio() }, nc).replace(/<div class="r"><span>Capital<\/span>.*?<\/div>/, '')}`;
         },
       });
+      // Si cambia la fecha del pago, se vuelve a sugerir el inicio (salvo que el usuario lo haya cambiado a mano).
+      let inicioManual = false;
+      q('inicio').addEventListener('input', () => { inicioManual = true; cond.recalc(); });
+      q('fecha').addEventListener('input', () => { if (!inicioManual && q('fecha').value) q('inicio').value = inicioSugerido(q('fecha').value); cond.recalc(); });
       ['interesPagado', 'abonoCapital'].forEach((n) => q(n).addEventListener('input', cond.recalc));
       cond.recalc();
       $('[data-ok]', el).onclick = async () => {
@@ -612,7 +625,7 @@ export function abrirRenovacion(app, p) {
           valor: pago(),
           interesPagado: parseMoney(q('interesPagado').value),
           abonoCapital: parseMoney(q('abonoCapital').value),
-          ciclo: { tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos },
+          ciclo: { inicio: inicio(), tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos },
         });
         await app.save();
         api.close();
@@ -627,21 +640,24 @@ export function abrirEditar(app, p) {
   const c = calcular(p, today(), cfg());
   const ref = c.ciclo.ref; // movimiento de renovación si el ciclo actual viene de una
   const v = ref
-    ? { fecha: ref.fecha, ...ref.ciclo }
-    : { fecha: p.fecha, capital: p.capital, modalidad: p.modalidad, tasa: p.tasa, nCuotas: p.nCuotas, valorCuota: p.valorCuota, cobraDomingos: p.cobraDomingos !== false };
+    ? { fecha: ref.fecha, ...ref.ciclo, inicio: ref.ciclo?.inicio || ref.fecha }
+    :{ fecha: p.fecha, capital: p.capital, modalidad: p.modalidad, tasa: p.tasa, nCuotas: p.nCuotas, valorCuota: p.valorCuota, cobraDomingos: p.cobraDomingos !== false };
   sheet({
     title: ref ? 'Editar ciclo actual' : 'Editar préstamo',
     ico: 'edit',
     tone: 'tone-info',
     body: `${ref ? `<p class="small muted" style="margin-top:-6px">Este préstamo fue renovado el ${fdate(ref.fecha)}. Aquí cambias las condiciones del ciclo actual (capital ${money(c.ciclo.capital)}).</p>` : ''}
-      ${condicionesHtml(v, { conCapital: !ref, labelFecha: ref ? 'Fecha de la renovación' : 'Fecha del préstamo' })}
+      ${condicionesHtml(v, { conCapital: !ref, labelFecha: ref ? 'Fecha de la renovación (pago)' : 'Fecha del préstamo',
+        despuesFecha: ref ? field('El periodo cuenta desde', `<input type="date" name="inicio" value="${esc(v.inicio)}">`, 'De aquí salen las fechas de cobro de este ciclo.') : '' })}
       ${!ref ? field('Notas', `<textarea name="notas">${esc(p.notas || '')}</textarea>`) : ''}
       ${!ref ? `<div class="field"><label>Cliente</label><select name="cliente" class="input">${[...store.state.clientes].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map((x) => `<option value="${x.id}" ${x.id === p.clienteId ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
       <div class="summary" data-res></div>
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar cambios</button>`,
     onMount(el, api) {
       const res = $('[data-res]', el);
-      const cond = bindCondiciones(el, { getCapital: () => c.ciclo.capital, onChange: (x) => (res.innerHTML = resumenCondiciones(x)) });
+      const inicioEl = el.querySelector('[name=inicio]');
+      const cond = bindCondiciones(el, { getCapital: () => c.ciclo.capital, onChange: (x) => (res.innerHTML = resumenCondiciones(inicioEl ? { ...x, fecha: inicioEl.value || x.fecha } : x)) });
+      inicioEl?.addEventListener('input', () => cond.recalc());
       cond.setManual(true); // respeta la cuota guardada; si cambian datos, el usuario la ajusta o la borra
       el.querySelector('[name=valorCuota]').insertAdjacentHTML('afterend', '<button type="button" class="btn ghost sm" data-auto style="justify-self:start;padding-left:0">Recalcular cuota automáticamente</button>');
       $('[data-auto]', el).onclick = () => { cond.setManual(false); cond.recalc(); };
@@ -651,7 +667,7 @@ export function abrirEditar(app, p) {
         if (!(x.valorCuota > 0)) return toast('Revisa el valor de la cuota', 'err');
         if (ref) {
           ref.fecha = x.fecha;
-          ref.ciclo = { tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos };
+          ref.ciclo = { inicio: inicioEl.value || x.fecha, tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos };
         } else {
           if (!(x.capital > 0)) return toast('Escribe el capital', 'err');
           Object.assign(p, x, { notas: $('[name=notas]', el).value.trim(), clienteId: $('[name=cliente]', el).value || p.clienteId });
@@ -710,6 +726,7 @@ function abrirMovimiento(app, p, m) {
       : `<div class="summary"><div class="r"><span>Fecha</span><b>${fdate(m.fecha)}</b></div>
           ${m.valor ? `<div class="r"><span>Pagó</span><b>${money(m.valor)}</b></div>` : ''}
           ${m.tipo === 'renovacion' ? `<div class="r"><span>Interés / abono</span><b>${money(m.interesPagado || 0)} / ${money(m.abonoCapital || 0)}</b></div>` : ''}
+          ${m.tipo === 'renovacion' && m.ciclo?.inicio && m.ciclo.inicio !== m.fecha ? `<div class="r"><span>Nuevo periodo desde</span><b>${fdate(m.ciclo.inicio)}</b></div>` : ''}
           ${m.nota ? `<div class="r"><span>Nota</span><b>${esc(m.nota)}</b></div>` : ''}</div>
           <p class="small muted">${m.tipo === 'renovacion' ? 'Para cambiar las condiciones del ciclo usa “Editar”. Si lo eliminas, el préstamo vuelve a las condiciones anteriores.' : 'Si lo eliminas, la app volverá a avisarte de este interés.'}</p>`}
       <button class="btn danger block" data-del>${icon('trash', 'sm')} Eliminar movimiento</button>`,

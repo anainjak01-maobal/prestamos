@@ -5,7 +5,7 @@
 //   interes          { valor, pct, base }            → interés sobre interés: suma al saldo
 //   interes_omitido  { }                             → el usuario decidió no aplicar el interés que tocaba
 //   ajuste           { valor (+/-) }                 → corrección manual del saldo
-//   renovacion       { valor, interesPagado, abonoCapital, ciclo:{tasa,nCuotas,valorCuota,modalidad,cobraDomingos} }
+//   renovacion       { valor, interesPagado, abonoCapital, ciclo:{inicio?,tasa,nCuotas,valorCuota,modalidad,cobraDomingos} }
 //                    → el cliente paga interés + abono a capital; el saldo que queda pasa a ser el capital
 //                      de un ciclo nuevo y se le calcula de nuevo el interés y las cuotas.
 import { addDays, addMonths, isSunday, diffDays, today, monthKey, sum } from './utils.js';
@@ -96,7 +96,8 @@ export function calcular(p, hoy = today(), cfg = {}) {
     } else if (m.tipo === 'renovacion') {
       saldo -= v; pagado += v; c.pagado += v;
       lineas.push({ fecha: m.fecha, tipo: 'pago', abono: v, saldo, nota: 'Pago de interés + abono a capital', mov: m });
-      const nc = mkCiclo(m.fecha, Math.max(0, saldo), m.ciclo || p, m);
+      // El nuevo periodo cuenta desde ciclo.inicio (fecha fija, normalmente el fin del plazo anterior) o desde el pago.
+      const nc = mkCiclo(m.ciclo?.inicio || m.fecha, Math.max(0, saldo), m.ciclo || p, m);
       ciclos.push(nc);
       saldo = nc.total;
       lineas.push({ fecha: m.fecha, tipo: 'renovacion', cargo: nc.interes, saldo, nota: `Nuevo capital ${nc.capital.toLocaleString('es-CO')} + ${nc.tasa}% interés`, mov: m });
@@ -332,7 +333,10 @@ export function gananciaPorMes(calcs) {
   const out = {};
   for (const c of calcs) {
     if (c.p.estado === 'anulado') continue;
-    for (const ci of c.ciclos) out[monthKey(ci.inicio)] = (out[monthKey(ci.inicio)] || 0) + ci.interes;
+    for (const ci of c.ciclos) {
+      const f = ci.ref ? ci.ref.fecha : ci.inicio; // el interés de una renovación se registra el día en que se hizo
+      out[monthKey(f)] = (out[monthKey(f)] || 0) + ci.interes;
+    }
     for (const m of c.p.movs || []) if (m.tipo === 'interes') out[monthKey(m.fecha)] = (out[monthKey(m.fecha)] || 0) + (m.valor || 0);
   }
   return out;

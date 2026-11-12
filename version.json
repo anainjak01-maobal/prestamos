@@ -1,8 +1,10 @@
 {
-  "version": "1.10.1",
+  "version": "1.11.0",
   "fecha": "2026-11-12",
   "novedades": [
-    "Clientes que solo pagan los intereses del mes: usa “Interés + abono” y deja el abono en 0. La deuda sigue igual y empieza otro mes con su interés.",
-    "Corregido: lo que pagan de intereses en una renovación ahora cuenta como ganancia cobrada en ese mes (en estadísticas, informe y PDF)."
+    "Interés + abono: la fecha de cobro ahora se mantiene fija. Si el cliente paga unos días tarde o antes, el nuevo periodo cuenta desde el fin del plazo anterior (por ejemplo, siempre el día 1.°).",
+    "En esa pantalla puedes cambiar desde qué día cuenta el nuevo periodo, si hace falta.",
+    "Clientes que solo pagan los intereses del mes: usa “Interés + abono” y deja el abono en 0.",
+    "Corregido: los intereses pagados en una renovación cuentan como ganancia cobrada de ese mes."
   ]
 }
