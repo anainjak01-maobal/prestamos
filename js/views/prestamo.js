@@ -379,11 +379,11 @@ function datosHtml(c, cl) {
 // =====================================================================
 // Acciones
 // =====================================================================
-export function abrirPago(app, p, { onDone } = {}) {
+export function abrirPago(app, p, { onDone, valor, fecha } = {}) {
   const c = calcular(p, today(), cfg());
   const cl = getCliente(p.clienteId);
   // Por defecto, el valor de la cuota pactada (o el saldo, si es menor).
-  const sug = Math.min(c.saldo, c.valorCuota);
+  const sug = valor > 0 ? Math.min(c.saldo, valor) : Math.min(c.saldo, c.valorCuota);
   const chips = [[`Cuota ${money(Math.min(c.valorCuota, c.saldo))}`, Math.min(c.valorCuota, c.saldo)]];
   if (c.atraso > c.valorCuota) chips.push([`Lo atrasado ${money(c.atraso)}`, c.atraso]);
   chips.push([`Todo ${money(c.saldo)}`, c.saldo]);
@@ -393,7 +393,7 @@ export function abrirPago(app, p, { onDone } = {}) {
     tone: 'tone-ok',
     body: `<p class="small muted" style="margin-top:-6px">${esc(cl?.nombre || '')} · Préstamo #${p.id} · Saldo <b>${money(c.saldo)}</b></p>
       ${c.atraso > c.valorCuota ? `<button type="button" class="btn block" data-varios style="margin-bottom:14px">${icon('calendar', 'sm')} Registrar varios pagos (días atrasados)</button>` : ''}
-      ${field('Fecha del pago', `<input type="date" name="fecha" value="${today()}" max="${today()}">`, 'Cámbiala si el pago fue otro día.')}
+      ${field('Fecha del pago', `<input type="date" name="fecha" value="${fecha || today()}" max="${today()}">`, 'Cámbiala si el pago fue otro día.')}
       ${moneyField('valor', 'Valor que paga', sug)}
       <div class="quick-amts">${chips.map(([t, v]) => `<button type="button" data-v="${v}">${esc(t)}</button>`).join('')}</div>
       ${field('Nota', '<input name="nota" placeholder="Opcional">')}
@@ -604,7 +604,8 @@ export function abrirRenovacion(app, p) {
           res.innerHTML = nc <= 0
             ? `<div class="r" style="color:var(--warn)"><span>Con ese pago queda a paz y salvo. Usa “Cobrar”.</span></div>`
             : `<div class="r"><span>Paga hoy</span><b style="color:var(--ok)">${money(pago())}</b></div>
-               <div class="r"><span>Nuevo capital</span><b>${money(nc)}</b></div>${resumenCondiciones({ ...x, fecha: inicio() }, nc).replace(/<div class="r"><span>Capital<\/span>.*?<\/div>/, '')}`;
+               <div class="r"><span>Nuevo capital</span><b>${money(nc)}</b></div>${resumenCondiciones({ ...x, fecha: inicio() }, nc).replace(/<div class="r"><span>Capital<\/span>.*?<\/div>/, '')}
+               <div class="r small" style="color:var(--warn);display:block;line-height:1.4">⚠️ Esto abre <b>otro periodo</b> y le suma un <b>interés nuevo de ${money(interesDe(nc, x.tasa))}</b>. Si el cliente está <b>terminando de pagar</b> la deuda (en una o varias partes), cierra esto y usa <b>Cobrar</b>.</div>`;
         },
       });
       // Si cambia la fecha del pago, se vuelve a sugerir el inicio (salvo que el usuario lo haya cambiado a mano).
@@ -619,6 +620,22 @@ export function abrirRenovacion(app, p) {
         if (pago() < 0) return toast('Revisa los valores', 'err');
         if (nc <= 0) return toast('Con ese pago queda a paz y salvo: usa “Cobrar”', 'err');
         if (!(x.valorCuota > 0)) return toast('Revisa el valor de la cuota', 'err');
+        // Si además abona a capital, confirmar: puede ser que en realidad esté terminando de pagar en partes.
+        if (parseMoney(q('abonoCapital').value) > 0) {
+          const nuevoInt = interesDe(nc, x.tasa);
+          const ok = await confirmDialog({
+            title: '¿El cliente sigue con el préstamo otro periodo?',
+            text: `Va a quedar debiendo <b>${money(nc + nuevoInt)}</b>: capital ${money(nc)} + interés nuevo ${money(nuevoInt)}.<br><br>Si está <b>terminando de pagar</b> la deuda en partes, toca “No, usar Cobrar”: así no se le suma interés nuevo.`,
+            ok: 'Sí, sigue otro periodo',
+            cancel: 'No, usar Cobrar',
+          });
+          if (!ok) {
+            const prefill = { valor: pago(), fecha: x.fecha };
+            api.close();
+            afterLayers(() => abrirPago(app, p, prefill));
+            return;
+          }
+        }
         addMov(p, {
           tipo: 'renovacion',
           fecha: x.fecha,

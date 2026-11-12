@@ -1,10 +1,9 @@
 {
-  "version": "1.11.0",
+  "version": "1.11.1",
   "fecha": "2026-11-12",
   "novedades": [
-    "Interés + abono: la fecha de cobro ahora se mantiene fija. Si el cliente paga unos días tarde o antes, el nuevo periodo cuenta desde el fin del plazo anterior (por ejemplo, siempre el día 1.°).",
-    "En esa pantalla puedes cambiar desde qué día cuenta el nuevo periodo, si hace falta.",
-    "Clientes que solo pagan los intereses del mes: usa “Interés + abono” y deja el abono en 0.",
-    "Corregido: los intereses pagados en una renovación cuentan como ganancia cobrada de ese mes."
+    "Interés + abono ahora te avisa que abre otro periodo con un interés nuevo.",
+    "Si además del interés el cliente abona a capital, la app te pregunta si sigue con el préstamo. Si está terminando de pagar en partes, toca “No, usar Cobrar” y se abre Cobrar con el mismo valor y fecha.",
+    "La fecha de cobro se mantiene fija aunque el cliente pague unos días tarde o antes."
   ]
 }
