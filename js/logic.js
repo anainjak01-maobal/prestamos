@@ -393,8 +393,10 @@ export const saldoSocio = (s) => sum(s.movs || [], (m) => (m.tipo === 'retiro' ?
 // ---- Informe mensual para socios ----
 /**
  * Resumen de un mes ('AAAA-MM'): lo que pasó en el mes y cómo quedó todo al cierre
- * (último día del mes, o hoy si es el mes en curso). El reparto por socio es una referencia
- * según el % de aporte de cada uno.
+ * (último día del mes, o hoy si es el mes en curso).
+ * Reparto: se reparte la ganancia PACTADA del mes menos los gastos, según el % de ganancia de cada
+ * socio (socio.pctGanancia; 0 = solo dejó dinero guardado). A cada uno se le puede descontar
+ * lo que deba al negocio ese mes (socio.descuentos[mes] = { valor, nota }).
  */
 export function informeMes(state, mes, hoy = today()) {
   const finMes = addDays(addMonths(mes + '-01', 1), -1);
@@ -422,6 +424,7 @@ export function informeMes(state, mes, hoy = today()) {
   const gananciaCobrada = gananciaCobradaPorMes(state)[mes] || 0;
   const gm = gastosPorMes(state)[mes] || { gastos: 0, retiros: 0 };
   const gananciaNeta = gananciaCobrada - gm.gastos;
+  const aRepartir = pactada - gm.gastos;
 
   // Estado al corte: los mismos cálculos de siempre, con lo registrado hasta esa fecha.
   const snap = {
@@ -432,25 +435,30 @@ export function informeMes(state, mes, hoy = today()) {
   };
   const r = resumenGeneral(snap, corte);
 
+  const original = new Map(state.socios.map((s) => [s.id, s]));
   const socios = snap.socios.map((s) => {
     const base = saldoSocio(s);
-    const pct = r.capitalBase > 0 ? base / r.capitalBase : 0;
+    const pct = Math.max(0, Number(s.pctGanancia) || 0) / 100;
     const delMes = (s.movs || []).filter((m) => enMes(m.fecha));
+    const desc = original.get(s.id)?.descuentos?.[mes] || null;
+    const parteGanancia = Math.round(aRepartir * pct);
+    const descuento = Math.round(Number(desc?.valor) || 0);
     return {
-      socio: s, base, pct,
+      socio: original.get(s.id) || s, base, pct, participa: pct > 0,
       aportes: sum(delMes.filter((m) => m.tipo !== 'retiro'), (m) => m.valor),
       retiros: sum(delMes.filter((m) => m.tipo === 'retiro'), (m) => m.valor),
-      parteGanancia: Math.round(gananciaNeta * pct),
+      parteGanancia, descuento, notaDescuento: desc?.nota || '', aRecibir: parteGanancia - descuento,
     };
   });
+  const sumaPct = Math.round(sum(socios, (x) => x.pct) * 1000) / 10;
 
   return {
     mes, corte, finMes, enCurso: corte < finMes,
     prestado: sum(nuevos, (p) => p.capital), nNuevos: nuevos.length,
     cobrado, nPagos,
     pactada, intereses: pactada - adicionales, adicionales, nAdicionales,
-    gananciaCobrada, gastos: gm.gastos, retiros: gm.retiros, gananciaNeta,
+    gananciaCobrada, gastos: gm.gastos, retiros: gm.retiros, gananciaNeta, aRepartir,
     terminados: terminados.length,
-    r, socios,
+    r, socios, sumaPct, repartoConfigurado: socios.some((x) => x.participa),
   };
 }

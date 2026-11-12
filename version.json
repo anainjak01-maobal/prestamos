@@ -1,10 +1,10 @@
 {
-  "version": "1.6.0",
+  "version": "1.7.0",
   "fecha": "2026-11-12",
   "novedades": [
-    "Informe para socios (Más → Informe para socios, o desde Capital): lo prestado, lo cobrado, la ganancia pactada y cobrada, los adicionales, los gastos, los retiros y la ganancia neta del mes.",
-    "El informe muestra cómo quedó todo al cierre del mes: capital, dinero en la calle, total deuda, disponible y ganancias acumuladas.",
-    "Cada socio aparece con su base, su % y su parte de la ganancia neta del mes (como referencia).",
-    "Puedes ver meses anteriores y compartir el informe por WhatsApp con un toque."
+    "Cada socio tiene ahora su % de la ganancia (Capital y socios → socio → lápiz). Pon 0 a quien solo dejó dinero guardado.",
+    "El informe para socios reparte la ganancia pactada del mes menos los gastos, según el % de cada socio.",
+    "En el informe puedes descontarle a un socio lo que deba al negocio ese mes: toca su nombre en el reparto.",
+    "Quien solo guarda dinero aparece aparte, sin ganancia."
   ]
 }

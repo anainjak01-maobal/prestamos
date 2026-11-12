@@ -5,6 +5,13 @@ import { resumenGeneral, movsSocio, saldoSocio } from '../logic.js';
 import { sheet, toast, field, moneyField, confirmDialog, emptyState, afterLayers } from '../ui.js';
 import * as store from '../store.js';
 
+/** Texto corto del % de ganancia de un socio. */
+export function textoPct(so) {
+  if (so.pctGanancia === undefined || so.pctGanancia === null) return 'sin % de ganancia asignado';
+  if (!(so.pctGanancia > 0)) return 'dinero guardado, sin ganancia';
+  return `${String(so.pctGanancia).replace('.', ',')} % de la ganancia`;
+}
+
 export function lista(app) {
   const s = app.state;
   const r = resumenGeneral(s, today());
@@ -32,8 +39,8 @@ export function lista(app) {
     ${s.socios.length ? `<div class="list">${s.socios.map((so) => {
       const n = (so.movs || []).length;
       return `<div class="item" data-href="#/socio/${so.id}"><div class="avatar ${avatarTone(so.nombre)}">${esc(initials(so.nombre))}</div>
-        <div class="grow"><div class="t ellipsis">${esc(so.nombre)}</div><div class="s">${n} movimiento${n === 1 ? '' : 's'}</div></div>
-        <div class="end"><span class="amt num">${money(saldoSocio(so))}</span>${r.capitalBase > 0 ? `<span class="small muted">${Math.round((saldoSocio(so) / r.capitalBase) * 100)}%</span>` : ''}</div></div>`;
+        <div class="grow"><div class="t ellipsis">${esc(so.nombre)}</div><div class="s">${esc(textoPct(so))} · ${n} movimiento${n === 1 ? '' : 's'}</div></div>
+        <div class="end"><span class="amt num">${money(saldoSocio(so))}</span>${r.capitalBase > 0 ? `<span class="small muted">${Math.round((saldoSocio(so) / r.capitalBase) * 100)}% del capital</span>` : ''}</div></div>`;
     }).join('')}</div>` : emptyState('bank', 'Sin socios registrados', 'Agrega a cada socio con su aporte de capital.')}
     <p class="tiny muted" style="margin:6px 4px">El <b>disponible</b> es el capital de los socios más la ganancia ya cobrada, menos el capital que está prestado y menos los gastos y retiros${r.gastos + r.retiros ? ` (${money(r.gastos + r.retiros)})` : ''}.</p>`;
   main.addEventListener('click', (e) => {
@@ -61,7 +68,7 @@ export function socio(app, id) {
   });
   main.innerHTML = `
     <div class="hero">
-      <div class="label">Saldo de base</div>
+      <div class="label">Saldo de base · ${esc(textoPct(so))}</div>
       <div class="big num">${money(saldo)}</div>
       <div class="split">
         <div><span>Aportes</span><b class="num">${money(aportes)}</b></div>
@@ -101,6 +108,7 @@ function abrirSocio(app, so = null) {
     tone: 'tone-violet',
     body: `${field('Nombre', `<input name="nombre" value="${esc(so?.nombre || '')}" autocapitalize="words">`)}
       ${so ? '' : `${moneyField('aporte', 'Aporte inicial')}${field('Fecha del aporte', `<input type="date" name="fecha" value="${today()}">`)}`}
+      ${field('% de la ganancia que le corresponde', `<input name="pct" inputmode="decimal" value="${so?.pctGanancia ?? ''}" placeholder="Ej: 50">`, 'Pon 0 si solo dejó dinero guardado, sin derecho a ganancia. Entre todos los socios deben sumar 100 %.')}
       ${field('Notas', `<textarea name="notas">${esc(so?.notas || '')}</textarea>`)}
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar</button>`,
     onMount(el, api) {
@@ -108,10 +116,13 @@ function abrirSocio(app, so = null) {
         const nombre = $('[name=nombre]', el).value.trim();
         if (!nombre) return toast('Escribe el nombre', 'err');
         const notas = $('[name=notas]', el).value.trim();
+        const pctTxt = $('[name=pct]', el).value.trim().replace(',', '.');
+        const pctGanancia = pctTxt === '' ? undefined : Number(pctTxt);
+        if (pctGanancia !== undefined && !(pctGanancia >= 0 && pctGanancia <= 100)) return toast('El % debe estar entre 0 y 100', 'err');
         let target = so;
-        if (so) Object.assign(so, { nombre, notas });
+        if (so) Object.assign(so, { nombre, notas, pctGanancia });
         else {
-          target = { id: uid(), nombre, notas, movs: [] };
+          target = { id: uid(), nombre, notas, pctGanancia, movs: [] };
           const v = parseMoney($('[name=aporte]', el).value);
           if (v > 0) target.movs.push({ id: uid(), ts: Date.now(), tipo: 'aporte', fecha: $('[name=fecha]', el).value || today(), valor: v, nota: 'Aporte inicial' });
           app.state.socios.push(target);
