@@ -165,6 +165,8 @@ export function calcular(p, hoy = today(), cfg = {}) {
     pagado, adicionales, ajustes, totalCiclo, valorCuota: vc,
     fechas, fechasPlan, fechaFin, debidas, cubiertas, atraso, aCobrarHoy, cuotaSugeridaHoy,
     proxima, diasMora, vencido, estado, activo, interesPendiente,
+    // Días que faltan para el fin del plazo (null si no está activo o el plazo ya llegó).
+    diasParaVencer: activo && hoy < fechaFin ? diffDays(fechaFin, hoy) : null,
     capitalPendiente, gananciaCobrada, interesesPactados,
     progreso: pagado + Math.max(0, saldo) > 0 ? pagado / (pagado + Math.max(0, saldo)) : 1,
   };
@@ -193,6 +195,27 @@ export function proyeccion(calc, desde, hasta) {
     restante -= monto;
   }
   return out;
+}
+
+// ---- Plazos por vencer ----
+/** Días de anticipación para avisar de los plazos por vencer (Ajustes; 7 por defecto). */
+export const diasPorVencer = (cfg) => Math.min(90, Math.max(1, parseInt(cfg?.diasPorVencer, 10) || 7));
+
+/** Préstamos activos cuyo plazo se cumple en los próximos `dias` días (sin contar hoy), del más cercano al más lejano. */
+export function porVencer(calcs, dias) {
+  return calcs
+    .filter((c) => c.diasParaVencer != null && c.diasParaVencer <= dias)
+    .sort((a, b) => a.diasParaVencer - b.diasParaVencer || b.saldo - a.saldo);
+}
+
+/**
+ * Lo que paga el cliente si solo paga los intereses del periodo (renovación con abono 0).
+ * Solo aplica a Quincenal y Mensual, que es donde se acostumbra. null si no aplica.
+ */
+export function interesSolo(c) {
+  if (!c.activo || !['Quincenal', 'Mensual'].includes(c.ciclo.modalidad)) return null;
+  const v = Math.min(c.saldo, c.ciclo.interes + Math.max(0, c.ciclo.extra));
+  return v > 0 && v < c.saldo ? v : null;
 }
 
 /** Resumen general de la cartera y el capital. */
@@ -234,6 +257,7 @@ export function resumenGeneral(state, hoy = today()) {
     nCobrarHoy: activos.filter((c) => c.aCobrarHoy > 0).length,
     atrasados: activos.filter((c) => c.estado === 'atrasado' || c.estado === 'vencido'),
     interesesPendientes: activos.filter((c) => c.interesPendiente),
+    porVencer: porVencer(activos, diasPorVencer(state.config)),
     gananciaCobrada,
     gananciaPactada: sum(calcs, (c) => c.interesesPactados),
     capitalBase,

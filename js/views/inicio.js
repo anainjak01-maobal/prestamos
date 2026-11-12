@@ -1,7 +1,7 @@
 // Pantalla de inicio: resumen del día, alertas y cobros pendientes.
 import { icon } from '../icons.js';
 import { $, money, ffull, today, diffDays, esc } from '../utils.js';
-import { resumenGeneral } from '../logic.js';
+import { resumenGeneral, diasPorVencer } from '../logic.js';
 import { emptyState } from '../ui.js';
 import { itemPrestamo, bindLista } from './prestamos.js';
 import { abrirPago } from './prestamo.js';
@@ -74,7 +74,11 @@ export function render(app) {
       ? `<div class="list">${cobrar.map((c) => itemPrestamo(c, { cobrar: true })).join('')}</div>`
       : s.prestamos.length
         ? emptyState('checkCircle', '¡Todo al día!', 'No hay cobros pendientes para hoy.')
-        : emptyState('wallet', 'Bienvenido', 'Empieza creando un cliente y su primer préstamo.', `<button class="btn primary" data-q="nuevo">${icon('plus', 'sm')} Nuevo préstamo</button>`)}`;
+        : emptyState('wallet', 'Bienvenido', 'Empieza creando un cliente y su primer préstamo.', `<button class="btn primary" data-q="nuevo">${icon('plus', 'sm')} Nuevo préstamo</button>`)}
+    ${r.porVencer.length ? `
+    <div class="section-title">Por vencer · próximos ${diasPorVencer(s.config)} días <a href="#/prestamos?filtro=porvencer">Ver todos</a></div>
+    <div class="list">${r.porVencer.slice(0, 8).map((c) => itemPrestamo(c, { porVencer: true })).join('')}</div>
+    ${r.porVencer.length > 8 ? `<a class="btn ghost block" href="#/prestamos?filtro=porvencer">Ver los ${r.porVencer.length}</a>` : ''}` : ''}`;
 
   bindLista(main, app, (id) => abrirPago(app, getPrestamo(id)));
   const respaldo = async () => {

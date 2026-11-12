@@ -1,9 +1,10 @@
 {
-  "version": "1.11.1",
+  "version": "1.12.0",
   "fecha": "2026-11-12",
   "novedades": [
-    "Interés + abono ahora te avisa que abre otro periodo con un interés nuevo.",
-    "Si además del interés el cliente abona a capital, la app te pregunta si sigue con el préstamo. Si está terminando de pagar en partes, toca “No, usar Cobrar” y se abre Cobrar con el mismo valor y fecha.",
-    "La fecha de cobro se mantiene fija aunque el cliente pague unos días tarde o antes."
+    "Nuevo: “Por vencer” en Inicio. Muestra los préstamos cuyo plazo se cumple en los próximos 7 días, con cuánto deben y cuánto son solo los intereses (mensual y quincenal).",
+    "En Préstamos hay un filtro nuevo, “Por vencer”, con la lista completa.",
+    "Con el botón verde de WhatsApp le mandas al cliente un recordatorio antes de la fecha (puedes cambiar el texto).",
+    "En Más → Ajustes puedes cambiar cuántos días antes quieres ver los plazos por vencer."
   ]
 }

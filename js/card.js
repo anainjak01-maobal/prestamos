@@ -1,6 +1,7 @@
 // Tarjeta digital del cliente (como la tarjeta física): imagen para compartir y texto para WhatsApp.
 import { money, num, fdate, today, waPhone } from './utils.js';
 import { download } from './backup.js';
+import { interesSolo } from './logic.js';
 
 const W = 1080;
 const PAD = 56;
@@ -190,11 +191,17 @@ export function textoEstadoCuenta({ negocio, cliente, calc, ultimos = 8 }) {
 }
 
 /** Mensaje de recordatorio de cobro para un cliente atrasado. */
-export function textoRecordatorio({ negocio, cliente, calc }) {
+export function textoRecordatorio({ negocio, cliente, calc }, { previo = false } = {}) {
   const nombre = (cliente?.nombre || '').split(/\s+/)[0] || '';
   const n = Math.max(1, Math.ceil(calc.atraso / calc.valorCuota));
   const out = [`Hola ${nombre}, le saludamos de *${negocio || 'Control de Cobros'}*.`];
-  if (calc.vencido) {
+  if (previo && calc.diasParaVencer != null) {
+    // Aviso antes de que se cumpla el plazo (por ejemplo, el mes).
+    const cuando = calc.diasParaVencer === 1 ? 'mañana' : `el ${fdate(calc.fechaFin)}`;
+    out.push(`Le recordamos que ${cuando} se cumple el plazo de su préstamo. Valor a pagar: *${money(calc.saldo)}*.`);
+    const soloInt = interesSolo(calc);
+    if (soloInt) out.push(`Si solo va a pagar los intereses, son *${money(soloInt)}*.`);
+  } else if (calc.vencido) {
     out.push(`Le recordamos que el plazo de su préstamo venció el ${fdate(calc.fechaFin)} y tiene un saldo pendiente de *${money(calc.saldo)}*.`);
   } else if (calc.atraso > 0) {
     out.push(`Le recordamos que tiene ${n} cuota${n > 1 ? 's' : ''} pendiente${n > 1 ? 's' : ''} por *${money(calc.atraso)}*${calc.diasMora > 0 ? ` (desde el ${fdate(calc.proxima)})` : ''}.`);

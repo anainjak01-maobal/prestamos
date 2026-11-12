@@ -7,6 +7,7 @@ import { exportBackup, pickBackupFile, pickMigrationFile } from '../backup.js';
 import { VERSION } from '../version.js';
 import { buscarActualizacion } from '../update.js';
 import { importarAdicionales } from './adicionales.js';
+import { diasPorVencer } from '../logic.js';
 
 const VERSION_APP = VERSION;
 
@@ -147,6 +148,7 @@ export function render(app) {
         ${field('Alerta de mora (días)', `<input type="number" name="alertaMora" min="1" value="${c.alertaMora}">`)}
         ${field('Indicativo WhatsApp', `<input name="indicativo" inputmode="numeric" value="${esc(c.indicativo)}">`)}
       </div>
+      ${field('Avisar plazos por vencer (días antes)', `<input type="number" name="diasPorVencer" inputmode="numeric" min="1" max="90" value="${diasPorVencer(c)}">`, 'En Inicio y en Préstamos → Por vencer salen los préstamos cuyo plazo se cumple en estos días.')}
       <h3 style="margin-top:6px">Seguridad</h3>
       ${field('Bloquear tras inactividad', `<select name="bloqueoMin">${[[1, '1 minuto'], [3, '3 minutos'], [5, '5 minutos'], [10, '10 minutos'], [30, '30 minutos'], [0, 'Nunca']].map(([v, t]) => `<option value="${v}" ${+c.bloqueoMin === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
       <button class="btn primary block" type="submit">${icon('check', 'sm')} Guardar ajustes</button>
@@ -164,6 +166,7 @@ export function render(app) {
       tasaAdicional: parseNum(f.tasaAdicional.value),
       cobraDomingos: f.cobraDomingos.checked,
       alertaMora: Math.max(1, parseInt(f.alertaMora.value, 10) || 5),
+      diasPorVencer: diasPorVencer({ diasPorVencer: f.diasPorVencer.value }),
       indicativo: f.indicativo.value.replace(/\D/g, '') || '57',
       bloqueoMin: parseInt(f.bloqueoMin.value, 10) || 0,
     });

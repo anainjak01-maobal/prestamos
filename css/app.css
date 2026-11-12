@@ -97,6 +97,7 @@ svg.i.lg { width: 28px; height: 28px; }
   display: inline-grid; place-items: center; cursor: pointer; color: var(--text);
 }
 .icon-btn:active { background: var(--surface-2); }
+.icon-btn.sm { width: 32px; height: 32px; border-radius: 10px; background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
 main.view { flex: 1; padding: 4px 16px calc(var(--tabbar-h) + var(--safe-b) + 92px); max-width: 720px; width: 100%; margin: 0 auto; }
 
 .tabbar {

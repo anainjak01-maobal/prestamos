@@ -18,6 +18,7 @@ export function emptyState() {
       tasaAdicional: 20,   // % del interés sobre interés
       cobraDomingos: true,
       alertaMora: 5,       // días de mora para alerta
+      diasPorVencer: 7,    // días antes del fin del plazo para mostrarlo en "Por vencer"
       bloqueoMin: 5,       // minutos de inactividad para bloquear
       ultimoRespaldo: null,
     },

@@ -270,9 +270,9 @@ export function detalle(app, id) {
 }
 
 /** Recordatorio de cobro: muestra el mensaje para revisarlo o cambiarlo y lo abre en WhatsApp. */
-export function abrirRecordatorio(p) {
+export function abrirRecordatorio(p, { previo = false } = {}) {
   const d = datosTarjeta(p);
-  const texto = textoRecordatorio(d);
+  const texto = textoRecordatorio(d, { previo });
   const tel = d.cliente?.telefono;
   sheet({
     title: 'Recordar pago',
