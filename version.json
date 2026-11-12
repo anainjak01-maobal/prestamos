@@ -1,9 +1,8 @@
 {
-  "version": "1.10.0",
+  "version": "1.10.1",
   "fecha": "2026-11-12",
   "novedades": [
-    "Al registrar un retiro de ganancia ahora eliges quién saca el dinero.",
-    "Ese retiro se le descuenta al socio en el reparto: ganancia − retiros − deuda = a recibir (en el informe, en el PDF y en el texto que se comparte).",
-    "Si hay retiros sin socio asignado, el informe te avisa para que los corrijas en Más → Gastos y retiros."
+    "Clientes que solo pagan los intereses del mes: usa “Interés + abono” y deja el abono en 0. La deuda sigue igual y empieza otro mes con su interés.",
+    "Corregido: lo que pagan de intereses en una renovación ahora cuenta como ganancia cobrada en ese mes (en estadísticas, informe y PDF)."
   ]
 }

@@ -573,7 +573,7 @@ export function abrirRenovacion(app, p) {
     title: 'Interés + abono a capital',
     ico: 'refresh',
     tone: 'tone-violet',
-    body: `<p class="small muted" style="margin-top:-6px">El cliente paga los intereses y abona al capital. Lo que queda debiendo pasa a ser el nuevo capital y se recalculan las cuotas.</p>
+    body: `<p class="small muted" style="margin-top:-6px">El cliente paga los intereses y abona al capital. Lo que queda debiendo pasa a ser el nuevo capital y se recalculan las cuotas.<br><b>Si solo paga los intereses</b>, deja el abono en 0: la deuda sigue igual y empieza otro periodo con su interés.</p>
       <div class="summary"><div class="r"><span>Saldo actual</span><b>${money(c.saldo)}</b></div></div>
       <div class="grid2">
         ${moneyField('interesPagado', 'Paga de interés', interesSug)}

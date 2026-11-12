@@ -256,20 +256,31 @@ export function gastosPorMes(state) {
 
 /**
  * Ganancia cobrada por mes: en cada préstamo los pagos cubren primero el capital y lo que pasa
- * del capital es ganancia, en la fecha de ese pago.
+ * del capital es ganancia, en la fecha de ese pago. En una renovación, lo que no baja el capital
+ * (por ejemplo, cuando el cliente solo paga los intereses) es ganancia de ese mes.
+ * Se calcula igual que `calcular().gananciaCobrada`, así que la suma de los meses da el total.
  */
 export function gananciaCobradaPorMes(state) {
   const out = {};
   for (const p of state.prestamos) {
     if (p.estado === 'anulado') continue;
-    let acum = 0;
-    const pagos = (p.movs || []).filter((m) => m.tipo === 'pago' || m.tipo === 'renovacion').sort(ordenMovs);
-    for (const m of pagos) {
-      const antes = Math.max(0, acum - p.capital);
-      acum += m.valor || 0;
-      const g = Math.max(0, acum - p.capital) - antes;
-      if (g > 0) out[monthKey(m.fecha)] = (out[monthKey(m.fecha)] || 0) + g;
-    }
+    const movs = [...(p.movs || [])].sort(ordenMovs);
+    const conRenovacion = movs.some((m) => m.tipo === 'renovacion');
+    let acum = 0, antes = 0;
+    movs.forEach((m, i) => {
+      if (m.tipo !== 'pago' && m.tipo !== 'renovacion') return;
+      let g;
+      if (conRenovacion) {
+        const total = calcular({ ...p, movs: movs.slice(0, i + 1) }, m.fecha).gananciaCobrada;
+        g = total - antes;
+        antes = total;
+      } else {
+        const prev = Math.max(0, acum - p.capital);
+        acum += m.valor || 0;
+        g = Math.max(0, acum - p.capital) - prev;
+      }
+      if (g) out[monthKey(m.fecha)] = (out[monthKey(m.fecha)] || 0) + g;
+    });
   }
   return out;
 }
