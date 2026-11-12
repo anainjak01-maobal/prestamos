@@ -1,11 +1,10 @@
 {
-  "version": "1.5.0",
+  "version": "1.6.0",
   "fecha": "2026-11-12",
   "novedades": [
-    "Nueva pantalla de Adicionales (toca «Adicionales» en Totales generales): los intereses adicionales aplicados en la app, con cliente, préstamo y fecha, y los históricos del Excel, línea por línea.",
-    "Botón Compartir para enviarle el detalle de los adicionales a los socios.",
-    "Más → Importar adicionales del Excel: agrega las líneas de la columna ADICIONALES sin borrar nada.",
-    "La ficha del cliente muestra sus adicionales históricos.",
-    "Totales generales como en el Excel: total deuda por cobrar, ganancia + adicionales y ganancia + capital."
+    "Informe para socios (Más → Informe para socios, o desde Capital): lo prestado, lo cobrado, la ganancia pactada y cobrada, los adicionales, los gastos, los retiros y la ganancia neta del mes.",
+    "El informe muestra cómo quedó todo al cierre del mes: capital, dinero en la calle, total deuda, disponible y ganancias acumuladas.",
+    "Cada socio aparece con su base, su % y su parte de la ganancia neta del mes (como referencia).",
+    "Puedes ver meses anteriores y compartir el informe por WhatsApp con un toque."
   ]
 }

@@ -27,6 +27,7 @@ export function lista(app) {
       <div class="kpi"><div class="ico tone-ok">${icon('trending', 'sm')}</div><div class="v num">${money(r.gananciaCobrada)}</div><div class="l">Ganancia cobrada</div></div>
       <div class="kpi"><div class="ico tone-violet">${icon('coins', 'sm')}</div><div class="v num">${money(r.capitalBase + r.gananciaCobrada)}</div><div class="l">Capital + ganancias</div></div>
     </div>
+    <a class="btn primary block" href="#/informe" style="margin-bottom:14px">${icon('file', 'sm')} Informe del mes para socios</a>
     <div class="section-title">Socios <span class="muted">${s.socios.length}</span></div>
     ${s.socios.length ? `<div class="list">${s.socios.map((so) => {
       const n = (so.movs || []).length;

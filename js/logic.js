@@ -389,3 +389,68 @@ export function movsSocio(s) {
   });
 }
 export const saldoSocio = (s) => sum(s.movs || [], (m) => (m.tipo === 'retiro' ? -m.valor : m.valor));
+
+// ---- Informe mensual para socios ----
+/**
+ * Resumen de un mes ('AAAA-MM'): lo que pasó en el mes y cómo quedó todo al cierre
+ * (último día del mes, o hoy si es el mes en curso). El reparto por socio es una referencia
+ * según el % de aporte de cada uno.
+ */
+export function informeMes(state, mes, hoy = today()) {
+  const finMes = addDays(addMonths(mes + '-01', 1), -1);
+  const corte = finMes < hoy ? finMes : hoy;
+  const enMes = (f) => monthKey(f) === mes;
+  const vigentes = state.prestamos.filter((p) => p.estado !== 'anulado');
+
+  // Movimiento del mes
+  const nuevos = vigentes.filter((p) => enMes(p.fecha));
+  let cobrado = 0, nPagos = 0, adicionales = 0, nAdicionales = 0;
+  for (const p of vigentes) {
+    for (const m of p.movs || []) {
+      if (!enMes(m.fecha)) continue;
+      if (m.tipo === 'pago' || m.tipo === 'renovacion') { cobrado += m.valor || 0; nPagos++; }
+      else if (m.tipo === 'interes') { adicionales += m.valor || 0; nAdicionales += m.resumen ? m.adicionales || 0 : 1; }
+    }
+  }
+  const calcsHoy = vigentes.map((p) => calcular(p, hoy, state.config));
+  const pactada = gananciaPorMes(calcsHoy)[mes] || 0;
+  const terminados = calcsHoy.filter((c) => {
+    if (c.estado !== 'pagado') return false;
+    const f = (c.p.movs || []).filter((m) => m.tipo === 'pago' || m.tipo === 'renovacion').map((m) => m.fecha).sort();
+    return f.length && enMes(f[f.length - 1]);
+  });
+  const gananciaCobrada = gananciaCobradaPorMes(state)[mes] || 0;
+  const gm = gastosPorMes(state)[mes] || { gastos: 0, retiros: 0 };
+  const gananciaNeta = gananciaCobrada - gm.gastos;
+
+  // Estado al corte: los mismos cálculos de siempre, con lo registrado hasta esa fecha.
+  const snap = {
+    ...state,
+    prestamos: state.prestamos.filter((p) => p.fecha <= corte).map((p) => ({ ...p, movs: (p.movs || []).filter((m) => m.fecha <= corte) })),
+    socios: state.socios.map((s) => ({ ...s, movs: (s.movs || []).filter((m) => m.fecha <= corte) })),
+    gastos: (state.gastos || []).filter((g) => g.fecha <= corte),
+  };
+  const r = resumenGeneral(snap, corte);
+
+  const socios = snap.socios.map((s) => {
+    const base = saldoSocio(s);
+    const pct = r.capitalBase > 0 ? base / r.capitalBase : 0;
+    const delMes = (s.movs || []).filter((m) => enMes(m.fecha));
+    return {
+      socio: s, base, pct,
+      aportes: sum(delMes.filter((m) => m.tipo !== 'retiro'), (m) => m.valor),
+      retiros: sum(delMes.filter((m) => m.tipo === 'retiro'), (m) => m.valor),
+      parteGanancia: Math.round(gananciaNeta * pct),
+    };
+  });
+
+  return {
+    mes, corte, finMes, enCurso: corte < finMes,
+    prestado: sum(nuevos, (p) => p.capital), nNuevos: nuevos.length,
+    cobrado, nPagos,
+    pactada, intereses: pactada - adicionales, adicionales, nAdicionales,
+    gananciaCobrada, gastos: gm.gastos, retiros: gm.retiros, gananciaNeta,
+    terminados: terminados.length,
+    r, socios,
+  };
+}
