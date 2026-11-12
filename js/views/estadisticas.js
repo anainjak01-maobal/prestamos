@@ -6,6 +6,7 @@ import { bars, donut } from '../charts.js';
 import { getCliente } from '../store.js';
 import { emptyState } from '../ui.js';
 import { bindLista } from './prestamos.js';
+import { tarjetaTotales, bindTotales } from './totales.js';
 
 export function render(app) {
   const s = app.state;
@@ -62,9 +63,10 @@ export function render(app) {
   });
 
   const topMora = [...r.activos].filter((c) => c.diasMora > 0).sort((a, b) => b.diasMora - a.diasMora).slice(0, 5);
-  const recuperacion = r.gananciaPactada > 0 ? Math.round((r.gananciaCobrada / r.gananciaPactada) * 100) : 0;
+  const recuperacion = r.gananciaTotal > 0 ? Math.round((r.gananciaCobrada / r.gananciaTotal) * 100) : 0;
 
   main.innerHTML = `
+    ${tarjetaTotales(r)}
     <div class="kpis">
       <div class="kpi"><div class="ico tone-ok">${icon('cash', 'sm')}</div><div class="v num">${money(cobMes[mesActual] || 0)}</div><div class="l">Cobrado este mes</div></div>
       <div class="kpi"><div class="ico tone-primary">${icon('wallet', 'sm')}</div><div class="v num">${money(prest[mesActual] || 0)}</div><div class="l">Prestado este mes</div></div>
@@ -109,13 +111,13 @@ export function render(app) {
 
     <div class="card"><h3>Ganancias</h3>
       <dl class="kv">
-        <dt>Ganancia pactada (total)</dt><dd>${money(r.gananciaPactada)}</dd>
+        <dt>Ganancia + adicionales</dt><dd>${money(r.gananciaTotal)}</dd>
         <dt>Ganancia ya cobrada</dt><dd>${money(r.gananciaCobrada)}</dd>
         <dt>Capital en la calle</dt><dd>${money(r.enCalle)}</dd>
         <dt>Por cobrar (capital + interés)</dt><dd>${money(r.porCobrar)}</dd>
       </dl>
       <div class="progress dark" style="margin-top:14px"><i style="width:${Math.min(100, recuperacion)}%"></i></div>
-      <div class="tiny muted">${recuperacion}% de la ganancia pactada ya está cobrada</div>
+      <div class="tiny muted">${recuperacion}% de la ganancia ya está cobrada</div>
     </div>
 
     ${topMora.length ? `<div class="section-title">Mayor mora</div><div class="list">${topMora.map((c) => {
@@ -125,4 +127,5 @@ export function render(app) {
         <div class="end"><span class="amt num">${money(c.saldo)}</span></div></div>`;
     }).join('')}</div>` : ''}`;
   bindLista(main, app);
+  bindTotales(main, app);
 }

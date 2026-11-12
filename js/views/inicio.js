@@ -10,6 +10,7 @@ import { abrirGasto } from './gastos.js';
 import { exportBackup } from '../backup.js';
 import { getPrestamo } from '../store.js';
 import { toast } from '../ui.js';
+import { tarjetaTotales, bindTotales } from './totales.js';
 
 function saludo() {
   const h = new Date().getHours();
@@ -47,7 +48,7 @@ export function render(app) {
   main.innerHTML = `
     <p class="muted" style="margin:-4px 4px 12px">${esc(ffull(hoy).replace(/^./, (x) => x.toUpperCase()))}</p>
     <div class="hero">
-      <div class="label">Por cobrar en total</div>
+      <div class="label">Total deuda por cobrar</div>
       <div class="big num">${money(r.porCobrar)}</div>
       <div class="split">
         <div><span>Para cobrar hoy</span><b class="num">${money(r.aCobrarHoy)}</b><span>${r.nCobrarHoy} cliente${r.nCobrarHoy === 1 ? '' : 's'}</span></div>
@@ -67,6 +68,7 @@ export function render(app) {
       <div class="kpi"><div class="ico tone-violet">${icon('bank', 'sm')}</div><div class="v num">${money(r.disponible)}</div><div class="l">Disponible</div></div>
       <div class="kpi"><div class="ico tone-danger">${icon('alert', 'sm')}</div><div class="v num">${r.atrasados.length}</div><div class="l">Atrasados / vencidos</div></div>
     </div>
+    ${s.prestamos.length ? `<div style="margin-top:14px">${tarjetaTotales(r)}</div>` : ''}
     <div class="section-title">Cobros de hoy <a href="#/prestamos?filtro=hoy">Ver todos</a></div>
     ${cobrar.length
       ? `<div class="list">${cobrar.map((c) => itemPrestamo(c, { cobrar: true })).join('')}</div>`
@@ -75,6 +77,7 @@ export function render(app) {
         : emptyState('wallet', 'Bienvenido', 'Empieza creando un cliente y su primer préstamo.', `<button class="btn primary" data-q="nuevo">${icon('plus', 'sm')} Nuevo préstamo</button>`)}`;
 
   bindLista(main, app, (id) => abrirPago(app, getPrestamo(id)));
+  bindTotales(main, app);
   const respaldo = async () => {
     const via = await exportBackup();
     if (via) toast(via === 'compartido' ? 'Respaldo compartido' : 'Respaldo descargado');
