@@ -6,7 +6,7 @@ import { bars, donut } from '../charts.js';
 import { getCliente } from '../store.js';
 import { emptyState } from '../ui.js';
 import { bindLista } from './prestamos.js';
-import { tarjetaTotales, bindTotales } from './totales.js';
+import { tarjetaTotales } from './totales.js';
 
 export function render(app) {
   const s = app.state;
@@ -127,5 +127,4 @@ export function render(app) {
         <div class="end"><span class="amt num">${money(c.saldo)}</span></div></div>`;
     }).join('')}</div>` : ''}`;
   bindLista(main, app);
-  bindTotales(main, app);
 }

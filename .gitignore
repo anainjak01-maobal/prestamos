@@ -14,3 +14,4 @@ CLAUDE.md
 # Herramientas locales
 __pycache__/
 .claude/
+adicionales*.json

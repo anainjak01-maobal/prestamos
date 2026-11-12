@@ -63,6 +63,29 @@ export function pickMigrationFile() {
   });
 }
 
+/** Abre el selector y devuelve el archivo de adicionales del Excel (generado por herramientas/adicionales_a_app.py). */
+export function pickAdicionalesFile() {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async () => {
+      const f = input.files?.[0];
+      if (!f) return resolve(null);
+      try {
+        const obj = JSON.parse(await f.text());
+        if (obj?.app !== 'control-de-cobros' || obj?.tipo !== 'adicionales-excel' || !Array.isArray(obj.lineas)) {
+          return reject(new Error('El archivo no es de adicionales del Excel (adicionales-excel.json).'));
+        }
+        resolve(obj);
+      } catch {
+        reject(new Error('No se pudo leer el archivo.'));
+      }
+    };
+    input.click();
+  });
+}
+
 /** Abre el selector de archivos y devuelve el respaldo leído (sin descifrar). */
 export function pickBackupFile() {
   return new Promise((resolve, reject) => {

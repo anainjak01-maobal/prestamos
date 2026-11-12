@@ -211,7 +211,8 @@ export function resumenGeneral(state, hoy = today()) {
   // Como la hoja GANANCIAS del Excel: intereses de cada préstamo + adicionales.
   const vigentes = calcs.filter((c) => c.p.estado !== 'anulado');
   const interesesPrestamos = sum(vigentes, (c) => sum(c.ciclos, (x) => x.interes));
-  const adicionalesAnteriores = Math.round(Number(state.config?.adicionalesAnteriores) || 0);
+  // Adicionales históricos del Excel (detallados) + el valor único que se pudo poner a mano antes de la v1.5.0.
+  const adicionalesAnteriores = sum(state.adicionalesHist || [], (a) => Math.round(Number(a.valor) || 0)) + Math.round(Number(state.config?.adicionalesAnteriores) || 0);
   const adicionales = sum(vigentes, (c) => c.adicionales) + adicionalesAnteriores;
   // Los adicionales anteriores (del Excel) ya se cobraron: cuentan como ganancia cobrada y entran al disponible.
   const gananciaCobrada = sum(calcs, (c) => c.gananciaCobrada) + adicionalesAnteriores;

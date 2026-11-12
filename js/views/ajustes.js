@@ -6,6 +6,7 @@ import * as store from '../store.js';
 import { exportBackup, pickBackupFile, pickMigrationFile } from '../backup.js';
 import { VERSION } from '../version.js';
 import { buscarActualizacion } from '../update.js';
+import { importarAdicionales } from './adicionales.js';
 
 const VERSION_APP = VERSION;
 
@@ -31,6 +32,7 @@ export function mas(app) {
       <button class="item" data-o="exportar"><span class="ico tone-ok">${icon('download')}</span><span class="grow"><span class="t">Exportar respaldo</span><br><span class="s">Último: ${esc(infoRespaldo(s.config))}</span></span>${icon('next', 'sm')}</button>
       <button class="item" data-o="importar"><span class="ico tone-warn">${icon('upload')}</span><span class="grow"><span class="t">Importar respaldo</span><br><span class="s">Reemplaza los datos de este teléfono</span></span>${icon('next', 'sm')}</button>
       <button class="item" data-o="excel"><span class="ico tone-info">${icon('file')}</span><span class="grow"><span class="t">Importar desde Excel</span><br><span class="s">Archivo migracion-excel.json</span></span>${icon('next', 'sm')}</button>
+      <button class="item" data-o="adicionales"><span class="ico tone-violet">${icon('percent')}</span><span class="grow"><span class="t">Importar adicionales del Excel</span><br><span class="s">Archivo adicionales-excel.json · solo agrega</span></span>${icon('next', 'sm')}</button>
     </div>
     <div class="section-title">Cuenta</div>
     <div class="list menu">
@@ -44,6 +46,7 @@ export function mas(app) {
     if (o === 'exportar') exportar(app);
     else if (o === 'importar') importar(app);
     else if (o === 'excel') importarExcel(app);
+    else if (o === 'adicionales') importarAdicionales(app);
     else if (o === 'bloquear') app.lock();
     else if (o === 'actualizar') buscarActualizacion({ avisarSiNoHay: true });
   });

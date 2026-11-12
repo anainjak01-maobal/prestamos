@@ -10,7 +10,7 @@ import { abrirGasto } from './gastos.js';
 import { exportBackup } from '../backup.js';
 import { getPrestamo } from '../store.js';
 import { toast } from '../ui.js';
-import { tarjetaTotales, bindTotales } from './totales.js';
+import { tarjetaTotales } from './totales.js';
 
 function saludo() {
   const h = new Date().getHours();
@@ -77,7 +77,6 @@ export function render(app) {
         : emptyState('wallet', 'Bienvenido', 'Empieza creando un cliente y su primer préstamo.', `<button class="btn primary" data-q="nuevo">${icon('plus', 'sm')} Nuevo préstamo</button>`)}`;
 
   bindLista(main, app, (id) => abrirPago(app, getPrestamo(id)));
-  bindTotales(main, app);
   const respaldo = async () => {
     const via = await exportBackup();
     if (via) toast(via === 'compartido' ? 'Respaldo compartido' : 'Respaldo descargado');

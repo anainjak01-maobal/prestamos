@@ -25,6 +25,7 @@ export function emptyState() {
     prestamos: [],
     socios: [],
     gastos: [],            // { id, ts, fecha, tipo: 'gasto' | 'retiro', categoria, valor, nota }
+    adicionalesHist: [],   // adicionales históricos del Excel, ya cobrados: { id, nombre, clienteId, valor, nota, fila, origen }
   };
 }
 
@@ -35,6 +36,7 @@ function migrate(s) {
   s.prestamos ||= [];
   s.socios ||= [];
   s.gastos ||= [];
+  s.adicionalesHist ||= [];
   s.formato = FORMATO;
   return s;
 }

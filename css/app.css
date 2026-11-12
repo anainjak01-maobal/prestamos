@@ -126,8 +126,8 @@ main.view { flex: 1; padding: 4px 16px calc(var(--tabbar-h) + var(--safe-b) + 92
 .card h3 svg { vertical-align: -3px; margin-right: 4px; }
 .card.totales .kv dt { align-self: center; }
 .card.totales .tot-deuda { font-size: 18px; }
-.link-btn { background: none; border: 0; padding: 2px 4px; margin-left: 2px; color: var(--primary-strong); cursor: pointer; vertical-align: middle; }
-.link-btn svg { width: 15px; height: 15px; }
+.link-row { color: var(--primary-strong); text-decoration: none; display: inline-flex; align-items: center; gap: 2px; }
+.link-row svg { width: 15px; height: 15px; }
 .card.flat { box-shadow: none; border: 1px solid var(--border); }
 .card h3, .section-title { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
 .section-title { margin: 22px 4px 10px; display: flex; align-items: center; justify-content: space-between; }

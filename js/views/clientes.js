@@ -70,6 +70,7 @@ export function detalle(app, id) {
   const pagado = calcs.reduce((s, c) => s + c.pagado, 0);
   const historial = calcs.filter((c) => !c.activo);
   const ganHist = historial.reduce((s, c) => s + c.gananciaCobrada, 0);
+  const adicHist = (app.state.adicionalesHist || []).filter((a) => a.clienteId === id);
   const main = app.shell({
     title: cl.nombre,
     back: '#/clientes',
@@ -105,6 +106,11 @@ export function detalle(app, id) {
         <span class="small muted">Ganancia <b style="color:var(--ok)">${money(ganHist)}</b></span></summary>
       <div class="list" style="margin:12px 0 0;box-shadow:none;border:1px solid var(--border)">${historial.map((c) => itemPrestamo(c, { showCliente: false })).join('')}</div>
     </details>` : ''}
+    ${adicHist.length ? `<div class="card flat" style="padding:12px 14px;margin-top:10px">
+      <a class="row between" href="#/adicionales" style="text-decoration:none;color:inherit"><span class="row" style="gap:8px">${icon('percent', 'sm')}<b>Adicionales históricos (Excel)</b></span>
+        <b style="color:var(--violet)">${money(adicHist.reduce((s, a) => s + a.valor, 0))}</b></a>
+      <ul class="small muted" style="margin:8px 0 0;padding-left:18px">${adicHist.map((a) => `<li>${money(a.valor)}${a.nota ? ` · ${esc(a.nota)}` : ''}</li>`).join('')}</ul>
+    </div>` : ''}
     <button class="btn danger block" data-del style="margin-top:10px">${icon('trash', 'sm')} Eliminar cliente</button>`;
   bindLista(main, app);
   main.parentElement.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => abrirFormCliente(app, cl, () => afterLayers(() => app.refresh()))));

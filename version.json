@@ -1,9 +1,11 @@
 {
-  "version": "1.4.1",
+  "version": "1.5.0",
   "fecha": "2026-11-12",
   "novedades": [
-    "Los adicionales anteriores del Excel (lápiz junto a «Adicionales») ahora también suman en la ganancia cobrada y en el disponible, porque ya están pagados.",
-    "Nueva tarjeta «Totales generales» en Inicio y en Gráficas, como en el Excel: total deuda por cobrar, ganancias (intereses), adicionales, ganancia + adicionales, capital base y ganancia + capital.",
-    "Con el lápiz junto a «Adicionales» puedes poner los adicionales anteriores del Excel (los que no están en ningún préstamo)."
+    "Nueva pantalla de Adicionales (toca «Adicionales» en Totales generales): los intereses adicionales aplicados en la app, con cliente, préstamo y fecha, y los históricos del Excel, línea por línea.",
+    "Botón Compartir para enviarle el detalle de los adicionales a los socios.",
+    "Más → Importar adicionales del Excel: agrega las líneas de la columna ADICIONALES sin borrar nada.",
+    "La ficha del cliente muestra sus adicionales históricos.",
+    "Totales generales como en el Excel: total deuda por cobrar, ganancia + adicionales y ganancia + capital."
   ]
 }
