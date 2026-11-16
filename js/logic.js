@@ -77,7 +77,9 @@ export function calcular(p, hoy = today(), cfg = {}) {
   const ciclos = [mkCiclo(p.fecha, p.capital, p, null)];
   let saldo = ciclos[0].total;
   let pagado = 0, adicionales = 0, ajustes = 0;
-  const lineas = [{ fecha: p.fecha, tipo: 'prestamo', cargo: saldo, saldo, nota: `Préstamo: capital + ${p.tasa}% interés` }];
+  const lineas = [{ fecha: p.fecha, tipo: 'prestamo', cargo: saldo, saldo, nota: p.interesFijo != null
+    ? `Préstamo: capital + interés ${ciclos[0].interes.toLocaleString('es-CO')} (redondeado)`
+    : `Préstamo: capital + ${p.tasa}% interés` }];
 
   for (const m of movs) {
     const c = ciclos[ciclos.length - 1];

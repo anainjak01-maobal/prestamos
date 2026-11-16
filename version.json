@@ -1,9 +1,9 @@
 {
-  "version": "1.14.0",
+  "version": "1.15.0",
   "fecha": "2026-11-16",
   "novedades": [
-    "Interés + abono: ahora puedes redondear el interés del nuevo periodo (por ejemplo de $222.000 a $220.000) con un toque o escribiéndolo.",
-    "La cuota y el total del nuevo periodo se recalculan con el interés redondeado.",
-    "En Editar ciclo también puedes cambiar el redondeo o volver al valor calculado."
+    "Nuevo préstamo: ahora puedes redondear el interés (por ejemplo de $222.000 a $220.000) con un toque o escribiéndolo.",
+    "La cuota y el total se recalculan con el interés redondeado.",
+    "En Editar préstamo también puedes cambiar el redondeo o volver al valor calculado."
   ]
 }

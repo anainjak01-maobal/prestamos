@@ -95,8 +95,8 @@ function resumenCondiciones(v, capital = v.capital) {
 // ---- Interés del periodo con redondeo (renovaciones) ----
 const abajo = (x, m) => Math.floor(x / m) * m;
 
-function interesRedondeableHtml(valor) {
-  return `${moneyField('interesNuevo', 'Interés del nuevo periodo', valor, 'Sale del porcentaje; puedes redondearlo.')}
+function interesRedondeableHtml(valor, label = 'Interés del nuevo periodo') {
+  return `${moneyField('interesNuevo', label, valor, 'Sale del porcentaje; puedes redondearlo.')}
     <div class="field" style="margin-top:-6px"><span class="lbl">Redondear</span><div class="quick-amts" data-red-int style="margin:0"></div></div>`;
 }
 
@@ -152,6 +152,7 @@ export function nuevo(app, _p, query) {
         <button type="button" class="btn sm" data-nuevo-cliente>${icon('userPlus', 'sm')} Nuevo</button></div>
         <div data-cal class="small"></div></div>
       ${condicionesHtml(v)}
+      ${interesRedondeableHtml('', 'Interés del préstamo')}
       ${field('Notas (opcional)', '<textarea name="notas" placeholder="Ej: fiador, acuerdo especial…"></textarea>')}
     </form>
     <div class="summary" data-res></div>
@@ -160,7 +161,15 @@ export function nuevo(app, _p, query) {
   $$('input.money', form).forEach(moneyInput);
   bindSegs(form);
   const res = $('[data-res]', main);
-  const cond = bindCondiciones(form, { onChange: (x) => { res.innerHTML = x.capital > 0 ? resumenCondiciones(x) : '<div class="r muted small">Escribe el valor prestado para ver el resumen.</div>'; } });
+  let cond = null;
+  const ir = bindInteresRedondeable(form, { capital: () => parseMoney(form.capital.value), onChange: () => cond.recalc() });
+  cond = bindCondiciones(form, {
+    getInteres: (tasa) => ir.override(tasa),
+    onChange: (x) => {
+      ir.pintar(x.tasa);
+      res.innerHTML = x.capital > 0 ? resumenCondiciones(x) : '<div class="r muted small">Escribe el valor prestado para ver el resumen.</div>';
+    },
+  });
   cond.recalc();
   const mostrarCal = () => {
     const id = form.cliente.value;
@@ -185,7 +194,12 @@ export function nuevo(app, _p, query) {
     if (!clienteId) return toast('Elige el cliente', 'err');
     if (!(x.capital > 0)) return toast('Escribe el valor prestado', 'err');
     if (!(x.valorCuota > 0)) return toast('Revisa el valor de la cuota', 'err');
-    const p = addPrestamo({ clienteId, ...x, notas: form.notas.value.trim() });
+    const { interes: _interes, ...cond0 } = x;
+    const fijo = ir.override(x.tasa);
+    const p = addPrestamo({
+      clienteId, ...cond0, notas: form.notas.value.trim(),
+      ...(fijo != null ? { interesFijo: fijo, interesCalculado: ir.calc(x.tasa) } : {}),
+    });
     await app.save();
     toast(`Préstamo #${p.id} creado`);
     app.go(`#/prestamo/${p.id}`);
@@ -417,7 +431,7 @@ function datosHtml(c, cl) {
       <dt>Cliente</dt><dd>${esc(cl?.nombre || '—')}</dd>
       <dt>Fecha del préstamo</dt><dd>${fdate(p.fecha)}</dd>
       <dt>Capital prestado</dt><dd>${money(p.capital)}</dd>
-      <dt>Interés inicial</dt><dd>${num(p.tasa)}% · ${money(interesDe(p.capital, p.tasa))}</dd>
+      <dt>Interés inicial</dt><dd>${num(p.tasa)}% · ${money(c.ciclos[0].interes)}${p.interesFijo != null ? ' (redondeado)' : ''}</dd>
       <dt>Modalidad actual</dt><dd>${esc(c.ciclo.modalidad)} · ${c.ciclo.nCuotas} cuotas</dd>
       <dt>Valor cuota</dt><dd>${money(c.valorCuota)}</dd>
       <dt>Fin del plazo</dt><dd>${fdate(c.fechaFin)}</dd>
@@ -767,7 +781,7 @@ export function abrirEditar(app, p) {
     body: `${ref ? `<p class="small muted" style="margin-top:-6px">Este préstamo fue renovado el ${fdate(ref.fecha)}. Aquí cambias las condiciones del ciclo actual (capital ${money(c.ciclo.capital)}).</p>` : ''}
       ${condicionesHtml(v, { conCapital: !ref, labelFecha: ref ? 'Fecha de la renovación (pago)' : 'Fecha del préstamo',
         despuesFecha: ref ? field('El periodo cuenta desde', `<input type="date" name="inicio" value="${esc(v.inicio)}">`, 'De aquí salen las fechas de cobro de este ciclo.') : '' })}
-      ${ref ? interesRedondeableHtml(ref.ciclo?.interesFijo ?? c.ciclo.interes) : ''}
+      ${ref ? interesRedondeableHtml(ref.ciclo?.interesFijo ?? c.ciclo.interes) : interesRedondeableHtml(p.interesFijo ?? c.ciclos[0].interes, 'Interés del préstamo')}
       ${!ref ? field('Notas', `<textarea name="notas">${esc(p.notas || '')}</textarea>`) : ''}
       ${!ref ? `<div class="field"><label>Cliente</label><select name="cliente" class="input">${[...store.state.clientes].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map((x) => `<option value="${x.id}" ${x.id === p.clienteId ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
       <div class="summary" data-res></div>
@@ -776,12 +790,14 @@ export function abrirEditar(app, p) {
       const res = $('[data-res]', el);
       const inicioEl = el.querySelector('[name=inicio]');
       let cond = null;
-      const ir = ref ? bindInteresRedondeable(el, { capital: () => c.ciclo.capital, fijoInicial: ref.ciclo?.interesFijo ?? null, onChange: () => cond.recalc() }) : null;
+      const ir = bindInteresRedondeable(el, ref
+        ? { capital: () => c.ciclo.capital, fijoInicial: ref.ciclo?.interesFijo ?? null, onChange: () => cond.recalc() }
+        : { capital: () => parseMoney(el.querySelector('[name=capital]').value), fijoInicial: p.interesFijo ?? null, onChange: () => cond.recalc() });
       cond = bindCondiciones(el, {
         getCapital: () => c.ciclo.capital,
-        getInteres: ir ? (tasa) => ir.override(tasa) : undefined,
+        getInteres: (tasa) => ir.override(tasa),
         onChange: (x) => {
-          ir?.pintar(x.tasa);
+          ir.pintar(x.tasa);
           res.innerHTML = resumenCondiciones(inicioEl ? { ...x, fecha: inicioEl.value || x.fecha } : x);
         },
       });
@@ -801,7 +817,11 @@ export function abrirEditar(app, p) {
           };
         } else {
           if (!(x.capital > 0)) return toast('Escribe el capital', 'err');
-          Object.assign(p, x, { notas: $('[name=notas]', el).value.trim(), clienteId: $('[name=cliente]', el).value || p.clienteId });
+          const { interes: _interes, ...cond0 } = x;
+          Object.assign(p, cond0, { notas: $('[name=notas]', el).value.trim(), clienteId: $('[name=cliente]', el).value || p.clienteId });
+          const fijo = ir.override(x.tasa);
+          if (fijo != null) { p.interesFijo = fijo; p.interesCalculado = ir.calc(x.tasa); }
+          else { delete p.interesFijo; delete p.interesCalculado; }
         }
         await app.save();
         api.close();
