@@ -1,6 +1,6 @@
 // Exportar e importar el respaldo (archivo .json cifrado).
 import * as store from './store.js';
-import { today } from './utils.js';
+import { today, diffDays, ymd } from './utils.js';
 
 export function backupFileName() {
   return `cobros-respaldo-${today()}.json`;
@@ -25,8 +25,43 @@ export async function exportBackup({ preferShare = true } = {}) {
     download(blob, name);
   }
   store.state.config.ultimoRespaldo = new Date().toISOString();
+  store.state.config.cambiosSinRespaldo = 0;
+  delete store.state.config.respaldoPospuesto;
   await store.save();
   return via;
+}
+
+export const CAMBIOS_RESPALDO = 50; // con tantos cambios sin respaldar también avisa, aunque no hayan pasado los días
+
+/** Día local (AAAA-MM-DD) del último respaldo. Se guarda en hora universal: de noche, en Colombia, ya sería el día siguiente. */
+export function diaRespaldo(cfg) {
+  const u = cfg?.ultimoRespaldo;
+  if (!u) return null;
+  const d = new Date(u);
+  return isNaN(d) ? String(u).slice(0, 10) : ymd(d);
+}
+
+export function diasRespaldo(cfg) {
+  const n = parseInt(cfg?.diasRespaldo, 10);
+  return Number.isFinite(n) ? Math.min(30, Math.max(1, n)) : 7;
+}
+
+/**
+ * Cuándo recordar el respaldo.
+ * toca: ya hay que hacerlo (pasaron N días, hay muchos cambios desde el último, o nunca se ha hecho).
+ * nivel: 'warn' o 'danger' (nunca, o el doble de días). mostrar: toca y no se pospuso hoy (el rojo no se pospone).
+ */
+export function estadoRespaldo(state, hoy = today()) {
+  const cfg = state?.config || {};
+  const n = diasRespaldo(cfg);
+  const hayDatos = !!(state?.prestamos?.length || state?.clientes?.length);
+  const ult = diaRespaldo(cfg);
+  const dias = ult ? Math.max(0, diffDays(hoy, ult)) : null;
+  const cambios = cfg.cambiosSinRespaldo || 0;
+  const toca = hayDatos && (dias === null || dias >= n || (cambios >= CAMBIOS_RESPALDO && dias >= 1));
+  const nivel = !toca ? 'ok' : dias === null || dias >= 2 * n ? 'danger' : 'warn';
+  const pospuesto = cfg.respaldoPospuesto === hoy;
+  return { toca, nivel, dias, cambios, n, mostrar: toca && (nivel === 'danger' || !pospuesto) };
 }
 
 export function download(blob, name) {

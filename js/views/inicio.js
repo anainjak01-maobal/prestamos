@@ -7,8 +7,9 @@ import { itemPrestamo, bindLista } from './prestamos.js';
 import { abrirPago } from './prestamo.js';
 import { abrirFormCliente } from './clientes.js';
 import { abrirGasto } from './gastos.js';
-import { exportBackup } from '../backup.js';
+import { exportBackup, estadoRespaldo } from '../backup.js';
 import { getPrestamo } from '../store.js';
+import * as store from '../store.js';
 import { toast } from '../ui.js';
 import { tarjetaTotales } from './totales.js';
 
@@ -31,15 +32,18 @@ export function render(app) {
 
   const cobrar = r.activos.filter((c) => c.aCobrarHoy > 0).sort((a, b) => b.diasMora - a.diasMora || b.aCobrarHoy - a.aCobrarHoy);
 
-  // Recordatorio de respaldo
-  let alertas = '';
-  const ult = s.config.ultimoRespaldo;
-  const dias = ult ? diffDays(hoy, ult.slice(0, 10)) : null;
-  if (s.prestamos.length && (dias === null || dias >= 7)) {
-    alertas += `<div class="alert info">${icon('shield')}<div class="grow"><b>${dias === null ? 'Aún no tienes respaldo' : `Último respaldo hace ${dias} días`}</b>
-      <p>Si pierdes el teléfono, solo podrás recuperar los datos con un respaldo.</p>
-      <button class="btn primary sm" data-respaldo>${icon('download', 'sm')} Hacer respaldo ahora</button></div></div>`;
+  // Recordatorio de respaldo: va arriba de todo
+  const er = estadoRespaldo(s, hoy);
+  let avisoRespaldo = '';
+  if (er.mostrar) {
+    const titulo = er.dias === null ? 'Aún no has hecho ningún respaldo'
+      : `Tu último respaldo fue hace ${er.dias} día${er.dias === 1 ? '' : 's'}`;
+    const cambios = er.cambios ? `Llevas <b>${er.cambios} cambio${er.cambios === 1 ? '' : 's'}</b> sin respaldar (pagos, préstamos, gastos…). ` : '';
+    avisoRespaldo = `<div class="alert ${er.nivel} respaldo-aviso">${icon('shield')}<div class="grow"><b>${titulo}</b>
+      <p>${cambios}Si pierdes o te roban el teléfono, <b>solo podrás recuperar los datos con un respaldo</b>. Guárdalo en Drive, en tu correo o envíatelo por WhatsApp.</p>
+      <div class="btn-row"><button class="btn primary sm" data-respaldo>${icon('download', 'sm')} Hacer respaldo ahora</button>${er.nivel === 'warn' ? '<button class="btn ghost sm" data-posponer>Recordar mañana</button>' : ''}</div></div></div>`;
   }
+  let alertas = '';
   if (r.interesesPendientes.length) {
     alertas += `<div class="alert warn">${icon('percent')}<div class="grow"><b>${r.interesesPendientes.length} préstamo${r.interesesPendientes.length > 1 ? 's' : ''} con interés adicional por aplicar</b>
       <p>El plazo venció y siguen debiendo.</p><a class="btn sm" href="#/prestamos?filtro=interes">Revisar</a></div></div>`;
@@ -52,6 +56,7 @@ export function render(app) {
 
   main.innerHTML = `
     <p class="muted" style="margin:-4px 4px 12px">${esc(ffull(hoy).replace(/^./, (x) => x.toUpperCase()))}</p>
+    ${avisoRespaldo}
     <div class="hero">
       <div class="label">Total deuda por cobrar</div>
       <div class="big num">${money(r.porCobrar)}</div>
@@ -98,6 +103,12 @@ export function render(app) {
     else if (q === 'gasto') abrirGasto(app);
     else if (q === 'cierre') app.go('#/cierre');
     if (e.target.closest('[data-respaldo]')) respaldo();
+    if (e.target.closest('[data-posponer]')) {
+      s.config.respaldoPospuesto = hoy;
+      store.save(); // no cuenta como cambio de datos
+      toast('Te lo recuerdo mañana');
+      app.refresh();
+    }
     const h = e.target.closest('.alert[data-href]');
     if (h) app.go(h.dataset.href);
   });

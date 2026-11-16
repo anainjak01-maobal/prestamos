@@ -18,6 +18,7 @@ import * as informe from './views/informe.js';
 import * as reporte from './views/reporte.js';
 import * as transferencias from './views/transferencias.js';
 import { buscarActualizacion, mostrarNovedadesSiCorresponde } from './update.js';
+import { estadoRespaldo } from './backup.js';
 
 const root = document.getElementById('app');
 
@@ -62,7 +63,11 @@ export const app = {
   refresh() { render(); },
   lock() { bloquear(); },
   get state() { return store.state; },
-  save() { return store.save(); },
+  save() {
+    const c = store.state?.config;
+    if (c) c.cambiosSinRespaldo = (c.cambiosSinRespaldo || 0) + 1;
+    return store.save();
+  },
   /** Arma la pantalla: barra superior, contenido, barra de pestañas y botón flotante. Devuelve el <main>. */
   shell({ title, tab, back, actions = '', fab }) {
     root.innerHTML = `<div class="shell">
@@ -72,7 +77,7 @@ export const app = {
       </header>
       <main class="view"></main>
       ${fab ? `<button class="fab" data-fab>${icon(fab.icon || 'plus')}${fab.label ? `<span>${esc(fab.label)}</span>` : ''}</button>` : ''}
-      <nav class="tabbar">${TABS.map(([id, href, ic, txt]) => `<a href="${href}" class="${tab === id ? 'on' : ''}"><span class="pill">${icon(ic)}</span>${txt}</a>`).join('')}</nav>
+      <nav class="tabbar">${TABS.map(([id, href, ic, txt]) => `<a href="${href}" class="${tab === id ? 'on' : ''}"><span class="pill">${icon(ic)}${id === 'mas' && estadoRespaldo(store.state).toca ? '<i class="tab-dot" aria-label="Respaldo pendiente"></i>' : ''}</span>${txt}</a>`).join('')}</nav>
     </div>`;
     if (fab) root.querySelector('[data-fab]').onclick = fab.onClick;
     return root.querySelector('main');

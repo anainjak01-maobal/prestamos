@@ -113,6 +113,13 @@ main.view { flex: 1; padding: 4px 16px calc(var(--tabbar-h) + var(--safe-b) + 92
 .tabbar a .pill { width: 54px; height: 30px; border-radius: 15px; display: grid; place-items: center; transition: background .2s; }
 .tabbar a.on { color: var(--primary-strong); }
 .tabbar a.on .pill { background: var(--primary-soft); }
+.tabbar a .pill { position: relative; }
+.tab-dot { position: absolute; top: 3px; right: 12px; width: 9px; height: 9px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--surface); }
+.respaldo-aviso { border: 1.5px solid; }
+.alert.warn.respaldo-aviso { border-color: var(--warn); }
+.alert.danger.respaldo-aviso { border-color: var(--danger); }
+.respaldo-aviso .btn-row { flex-wrap: wrap; }
+.respaldo-aviso .btn-row > * { flex: 0 1 auto; }
 
 .fab {
   position: fixed; right: max(16px, calc(50vw - 344px)); bottom: calc(var(--tabbar-h) + var(--safe-b) + 16px); z-index: 25;

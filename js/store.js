@@ -21,6 +21,8 @@ export function emptyState() {
       diasPorVencer: 7,    // días antes del fin del plazo para mostrarlo en "Por vencer"
       bloqueoMin: 5,       // minutos de inactividad para bloquear
       ultimoRespaldo: null,
+      diasRespaldo: 7,     // recordar el respaldo cada N días
+      cambiosSinRespaldo: 0, // cambios guardados desde el último respaldo
     },
     clientes: [],
     prestamos: [],
@@ -143,6 +145,7 @@ export async function replaceState(newState) {
   const prevBackup = state?.config?.ultimoRespaldo;
   state = migrate(newState);
   if (!state.config.ultimoRespaldo) state.config.ultimoRespaldo = prevBackup || null;
+  state.config.cambiosSinRespaldo = 0; // los datos son los del respaldo
   await save();
 }
 

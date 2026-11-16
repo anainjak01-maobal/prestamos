@@ -1,9 +1,9 @@
 {
-  "version": "1.17.0",
+  "version": "1.18.0",
   "fecha": "2026-11-16",
   "novedades": [
-    "Al cobrar eliges cómo pagó: Efectivo o Transferencia (y la cuenta: Nequi, banco…). Si el cliente suele transferir, la app lo propone.",
-    "Nueva pantalla Más → Transferencias: lo que está en las cuentas por retirar. Marcas las que sacaste y pasan a “Retiradas” (no se suman otra vez).",
-    "Inicio avisa cuánto hay por retirar. El cierre del día separa el efectivo de las transferencias y Capital muestra cuánto de la caja está en cuentas."
+    "El aviso de respaldo ahora sale arriba de todo en Inicio, con los cambios que llevas sin respaldar. Se pone rojo si pasa mucho tiempo.",
+    "Un punto rojo en la pestaña Más te recuerda que el respaldo está pendiente.",
+    "En Ajustes eliges cada cuántos días te lo recuerda (7 por defecto). Si hoy no puedes, toca “Recordar mañana”."
   ]
 }

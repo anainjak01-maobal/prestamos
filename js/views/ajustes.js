@@ -3,7 +3,7 @@ import { icon } from '../icons.js';
 import { $, esc, fdate, diffDays, today, parseNum } from '../utils.js';
 import { sheet, toast, field, switchHtml, confirmDialog, pwField, bindPw, afterLayers } from '../ui.js';
 import * as store from '../store.js';
-import { exportBackup, pickBackupFile, pickMigrationFile } from '../backup.js';
+import { exportBackup, pickBackupFile, pickMigrationFile, estadoRespaldo, diasRespaldo, diaRespaldo, CAMBIOS_RESPALDO } from '../backup.js';
 import { VERSION } from '../version.js';
 import { buscarActualizacion } from '../update.js';
 import { importarAdicionales } from './adicionales.js';
@@ -12,15 +12,16 @@ import { diasPorVencer } from '../logic.js';
 const VERSION_APP = VERSION;
 
 function infoRespaldo(cfg) {
-  const u = cfg.ultimoRespaldo;
+  const u = diaRespaldo(cfg);
   if (!u) return 'Nunca';
-  const d = diffDays(today(), u.slice(0, 10));
-  return `${fdate(u.slice(0, 10))} (${d === 0 ? 'hoy' : `hace ${d} día${d > 1 ? 's' : ''}`})`;
+  const d = Math.max(0, diffDays(today(), u));
+  return `${fdate(u)} (${d === 0 ? 'hoy' : `hace ${d} día${d > 1 ? 's' : ''}`})`;
 }
 
 export function mas(app) {
   const main = app.shell({ title: 'Más', tab: 'mas' });
   const s = app.state;
+  const pend = estadoRespaldo(s).toca;
   main.innerHTML = `
     <div class="list menu">
       <a class="item" href="#/capital"><span class="ico tone-violet">${icon('bank')}</span><span class="grow"><span class="t">Capital y socios</span><br><span class="s">Aportes, retiros y capital disponible</span></span>${icon('next', 'sm')}</a>
@@ -32,7 +33,7 @@ export function mas(app) {
     </div>
     <div class="section-title">Respaldo</div>
     <div class="list menu">
-      <button class="item" data-o="exportar"><span class="ico tone-ok">${icon('download')}</span><span class="grow"><span class="t">Exportar respaldo</span><br><span class="s">Último: ${esc(infoRespaldo(s.config))}</span></span>${icon('next', 'sm')}</button>
+      <button class="item" data-o="exportar"><span class="ico ${pend ? 'tone-danger' : 'tone-ok'}">${icon('download')}</span><span class="grow"><span class="t">Exportar respaldo${pend ? ' <span class="badge b-danger">Pendiente</span>' : ''}</span><br><span class="s">Último: ${esc(infoRespaldo(s.config))}${s.config.cambiosSinRespaldo ? ` · ${s.config.cambiosSinRespaldo} cambio${s.config.cambiosSinRespaldo === 1 ? '' : 's'} sin respaldar` : ''}</span></span>${icon('next', 'sm')}</button>
       <button class="item" data-o="importar"><span class="ico tone-warn">${icon('upload')}</span><span class="grow"><span class="t">Importar respaldo</span><br><span class="s">Reemplaza los datos de este teléfono</span></span>${icon('next', 'sm')}</button>
       <button class="item" data-o="excel"><span class="ico tone-info">${icon('file')}</span><span class="grow"><span class="t">Importar desde Excel</span><br><span class="s">Archivo migracion-excel.json</span></span>${icon('next', 'sm')}</button>
       <button class="item" data-o="adicionales"><span class="ico tone-violet">${icon('percent')}</span><span class="grow"><span class="t">Importar adicionales del Excel</span><br><span class="s">Archivo adicionales-excel.json · solo agrega</span></span>${icon('next', 'sm')}</button>
@@ -151,6 +152,7 @@ export function render(app) {
       </div>
       ${field('Avisar plazos por vencer (días antes)', `<input type="number" name="diasPorVencer" inputmode="numeric" min="1" max="90" value="${diasPorVencer(c)}">`, 'En Inicio y en Préstamos → Por vencer salen los préstamos cuyo plazo se cumple en estos días.')}
       <h3 style="margin-top:6px">Seguridad</h3>
+      ${field('Recordar el respaldo cada (días)', `<input type="number" name="diasRespaldo" inputmode="numeric" min="1" max="30" value="${diasRespaldo(c)}">`, `Inicio te avisa cuando pasen estos días sin respaldo, o antes si llevas ${CAMBIOS_RESPALDO} cambios sin respaldar.`)}
       ${field('Bloquear tras inactividad', `<select name="bloqueoMin">${[[1, '1 minuto'], [3, '3 minutos'], [5, '5 minutos'], [10, '10 minutos'], [30, '30 minutos'], [0, 'Nunca']].map(([v, t]) => `<option value="${v}" ${+c.bloqueoMin === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
       <button class="btn primary block" type="submit">${icon('check', 'sm')} Guardar ajustes</button>
     </form>
@@ -170,6 +172,7 @@ export function render(app) {
       diasPorVencer: diasPorVencer({ diasPorVencer: f.diasPorVencer.value }),
       indicativo: f.indicativo.value.replace(/\D/g, '') || '57',
       bloqueoMin: parseInt(f.bloqueoMin.value, 10) || 0,
+      diasRespaldo: diasRespaldo({ diasRespaldo: f.diasRespaldo.value }),
     });
     await app.save();
     toast('Ajustes guardados');
