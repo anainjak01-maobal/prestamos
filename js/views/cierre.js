@@ -1,7 +1,7 @@
 // Cierre del día: lo cobrado, lo prestado, los gastos y quién no pagó.
 import { icon } from '../icons.js';
 import { $, esc, money, today, addDays, ffull, fdate, avatarTone, initials } from '../utils.js';
-import { calcular } from '../logic.js';
+import { calcular, esTransferencia, transferencias } from '../logic.js';
 import { getCliente } from '../store.js';
 import { toast, emptyState } from '../ui.js';
 
@@ -24,6 +24,11 @@ export function render(app, _p, query) {
   const nuevos = s.prestamos.filter((p) => p.estado !== 'anulado' && p.fecha === fecha);
   const gastos = (s.gastos || []).filter((g) => g.fecha === fecha);
   const cobrado = pagos.reduce((a, x) => a + x.m.valor, 0);
+  // Lo que llegó por transferencia queda en la cuenta (no es efectivo). Lo que se sacó de las cuentas ese día sí entra al efectivo.
+  const cobradoTr = pagos.filter((x) => esTransferencia(x.m)).reduce((a, x) => a + x.m.valor, 0);
+  const nTr = pagos.filter((x) => esTransferencia(x.m)).length;
+  const retiradasDia = transferencias(s).filter((t) => t.m.retirado === fecha);
+  const sacado = retiradasDia.reduce((a, t) => a + t.m.valor, 0);
   const prestado = nuevos.reduce((a, p) => a + p.capital, 0);
   const totGastos = gastos.filter((g) => g.tipo !== 'retiro').reduce((a, g) => a + g.valor, 0);
   const totRetiros = gastos.filter((g) => g.tipo === 'retiro').reduce((a, g) => a + g.valor, 0);
@@ -32,7 +37,7 @@ export function render(app, _p, query) {
   const deudasSocios = s.socios.flatMap((so) => (so.deudas || []).filter((d) => d.fecha === fecha).map((d) => ({ so, d })));
   const prestadoSocios = deudasSocios.filter((x) => x.d.tipo === 'prestamo').reduce((a, x) => a + x.d.valor, 0);
   const abonosSocios = deudasSocios.filter((x) => x.d.tipo === 'abono' && x.d.origen !== 'aporte').reduce((a, x) => a + x.d.valor, 0);
-  const efectivo = cobrado - prestado - totGastos - totRetiros - prestadoSocios + abonosSocios;
+  const efectivo = cobrado - cobradoTr + sacado - prestado - totGastos - totRetiros - prestadoSocios + abonosSocios;
 
   // Quién no pagó (solo tiene sentido para hoy)
   let noPagaron = [];
@@ -69,11 +74,14 @@ export function render(app, _p, query) {
     <div class="kpis">
       <div class="kpi"><div class="ico tone-warn">${icon('cash', 'sm')}</div><div class="v num">${money(totGastos)}</div><div class="l">Gastos</div></div>
       <div class="kpi"><div class="ico tone-violet">${icon('arrowOut', 'sm')}</div><div class="v num">${money(totRetiros)}</div><div class="l">Retiros</div></div>
+      ${cobradoTr || sacado ? `<a class="kpi" href="#/transferencias"><div class="ico tone-info">${icon('transfer', 'sm')}</div><div class="v num">${money(cobradoTr)}</div><div class="l">Por transferencia (${nTr}) · quedan en la cuenta</div></a>
+      <a class="kpi" href="#/transferencias?ver=retiradas"><div class="ico tone-ok">${icon('cash', 'sm')}</div><div class="v num">${money(sacado)}</div><div class="l">Sacado de las cuentas (${retiradasDia.length})</div></a>` : ''}
     </div>
+    ${cobradoTr || sacado ? '<p class="tiny muted" style="margin:-4px 4px 10px">El efectivo del día no cuenta las transferencias (siguen en la cuenta) y sí suma lo que sacaste de las cuentas ese día.</p>' : ''}
     <button class="btn primary block" data-compartir style="margin-bottom:6px">${icon('share', 'sm')} Compartir cierre</button>
 
     <div class="section-title">Pagos recibidos <span class="muted">${pagos.length}</span></div>
-    ${pagos.length ? `<div class="list">${pagos.map(({ p, m }) => item(`#/prestamo/${p.id}`, nombre(p), `#${p.id}${m.tipo === 'renovacion' ? ' · interés + abono' : ''}${m.nota && m.nota !== 'Importado del Excel' ? ' · ' + esc(m.nota) : ''}`, money(m.valor), 'var(--ok)')).join('')}</div>`
+    ${pagos.length ? `<div class="list">${pagos.map(({ p, m }) => item(`#/prestamo/${p.id}`, nombre(p), `#${p.id}${esTransferencia(m) ? ` · <span class="tr-tag">transferencia${m.cuenta ? ' ' + esc(m.cuenta) : ''}</span>` : ''}${m.tipo === 'renovacion' ? ' · interés + abono' : ''}${m.nota && m.nota !== 'Importado del Excel' ? ' · ' + esc(m.nota) : ''}`, money(m.valor), 'var(--ok)')).join('')}</div>`
       : emptyState('cash', 'Sin pagos este día')}
 
     ${esHoy ? `<div class="section-title">No pagaron hoy <span class="muted">${noPagaron.length}</span></div>
@@ -100,6 +108,8 @@ export function render(app, _p, query) {
     const t = [];
     t.push(`*Cierre del día · ${fdate(fecha)}*`);
     t.push(`Cobrado: ${money(cobrado)} (${pagos.length} pagos)`);
+    if (cobradoTr) t.push(`  De eso por transferencia: ${money(cobradoTr)} (${nTr})`);
+    if (sacado) t.push(`Sacado de las cuentas: ${money(sacado)}`);
     t.push(`Prestado: ${money(prestado)} (${nuevos.length})`);
     if (totGastos) t.push(`Gastos: ${money(totGastos)}`);
     if (totRetiros) t.push(`Retiros: ${money(totRetiros)}`);
@@ -108,7 +118,7 @@ export function render(app, _p, query) {
     t.push(`*Efectivo del día: ${money(efectivo)}*`);
     if (pagos.length) {
       t.push('', 'Pagos:');
-      pagos.forEach(({ p, m }) => t.push(`• ${nombre(p)}: ${money(m.valor)}`));
+      pagos.forEach(({ p, m }) => t.push(`• ${nombre(p)}: ${money(m.valor)}${esTransferencia(m) ? ' (transferencia)' : ''}`));
     }
     if (noPagaron.length) {
       t.push('', 'No pagaron:');

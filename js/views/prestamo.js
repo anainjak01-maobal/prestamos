@@ -13,6 +13,59 @@ const cfg = () => store.state.config;
 const refreshLuego = (app, fn) => afterLayers(() => (fn ? fn() : app.refresh()));
 
 // =====================================================================
+// Medio de pago: efectivo o transferencia (las transferencias quedan "por retirar")
+// =====================================================================
+const cuentasUsadas = () => [...new Set(store.state.prestamos.flatMap((p) => (p.movs || []).filter((m) => m.cuenta).map((m) => m.cuenta)))].sort();
+
+/** Medio del último pago del cliente: si suele pagar por transferencia, se propone igual. */
+function medioSugerido(p) {
+  const movs = store.state.prestamos.filter((x) => x.clienteId === p.clienteId)
+    .flatMap((x) => (x.movs || []).filter((m) => m.tipo === 'pago' || m.tipo === 'renovacion'))
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : (a.ts || 0) - (b.ts || 0)));
+  const ult = movs[movs.length - 1];
+  return ult?.medio === 'transferencia' ? { medio: 'transferencia', cuenta: ult.cuenta || '' } : {};
+}
+
+function medioHtml(m = {}, { conRetiro = false } = {}) {
+  const tr = m.medio === 'transferencia';
+  return `<div class="field"><span class="lbl">¿Cómo pagó?</span>${segHtml('medio', ['Efectivo', 'Transferencia'], tr ? 'Transferencia' : 'Efectivo')}</div>
+    <div data-tr-wrap ${tr ? '' : 'hidden'}>
+      ${field('Cuenta donde llegó', `<input name="cuenta" list="cuentas-tr" value="${esc(m.cuenta || '')}" placeholder="Ej: Nequi, Bancolombia (opcional)">`,
+        conRetiro ? '' : 'Cuenta como pago normal y queda en la lista <b>Transferencias por retirar</b>.')}
+      <datalist id="cuentas-tr">${cuentasUsadas().map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
+      ${conRetiro ? `${switchHtml('retirado', 'Ya la saqué de la cuenta', !!m.retirado)}
+        <div data-ret-wrap ${m.retirado ? '' : 'hidden'}>${field('Fecha en que la sacaste', `<input type="date" name="fechaRetiro" value="${m.retirado || today()}" max="${today()}">`)}</div>` : ''}
+    </div>`;
+}
+
+/** Enlaza el selector de medio. Devuelve una función que da los campos a guardar en el movimiento. */
+function bindMedio(el) {
+  const wrap = $('[data-tr-wrap]', el);
+  const esTr = () => segValue(el, 'medio') === 'Transferencia';
+  $('[data-seg="medio"]', el).addEventListener('change', () => { wrap.hidden = !esTr(); });
+  const ret = el.querySelector('[name=retirado]');
+  ret?.addEventListener('change', () => { $('[data-ret-wrap]', el).hidden = !ret.checked; });
+  return () => {
+    if (!esTr()) return { medio: undefined, cuenta: undefined, retirado: undefined };
+    const cuenta = $('[name=cuenta]', el).value.trim();
+    return {
+      medio: 'transferencia',
+      cuenta: cuenta || undefined,
+      ...(ret ? { retirado: ret.checked ? $('[name=fechaRetiro]', el).value || today() : undefined } : {}),
+    };
+  };
+}
+
+/** Aplica los campos del medio a un movimiento (borra los que quedan vacíos). */
+function aplicarMedio(m, campos) {
+  for (const [k, v] of Object.entries(campos)) {
+    if (v === undefined) delete m[k];
+    else m[k] = v;
+  }
+  return m;
+}
+
+// =====================================================================
 // Formulario de condiciones (nuevo préstamo, editar, renovación)
 // =====================================================================
 function condicionesHtml(v, { conCapital = true, labelFecha = 'Fecha del préstamo', conFecha = true, despuesFecha = '' } = {}) {
@@ -388,8 +441,10 @@ function movsHtml(c) {
       prestamo: 'Préstamo', pago: 'Abono', interes: 'Interés adicional', interes_omitido: 'Interés no aplicado', ajuste: 'Ajuste', renovacion: 'Nuevo ciclo',
     }[l.tipo];
     const nota = l.nota && l.tipo !== 'pago' ? l.nota : l.nota || '';
+    const tr = l.mov?.medio === 'transferencia' && l.tipo === 'pago'
+      ? ` · <span class="tr-tag">Transferencia${l.mov.retirado ? '' : ' (por retirar)'}</span>` : '';
     const val = l.abono ? `<span class="abono">${num(l.abono)}</span>` : l.cargo ? `<span class="cargo">+${num(l.cargo)}</span>` : '<span class="muted">—</span>';
-    return `<tr class="tap" data-mov="${id}"><td>${fdate(l.fecha)}<span class="note">${esc(etiqueta)}${nota && l.tipo !== 'prestamo' ? ' · ' + esc(nota) : ''}</span></td>
+    return `<tr class="tap" data-mov="${id}"><td>${fdate(l.fecha)}<span class="note">${esc(etiqueta)}${tr}${nota && l.tipo !== 'prestamo' ? ' · ' + esc(nota) : ''}</span></td>
       <td>${val}</td><td class="resta">${num(Math.max(0, l.saldo))}</td></tr>`;
   }).join('');
   return `<div class="card" style="padding:6px 12px">
@@ -448,7 +503,7 @@ function datosHtml(c, cl) {
 // =====================================================================
 // Acciones
 // =====================================================================
-export function abrirPago(app, p, { onDone, valor, fecha } = {}) {
+export function abrirPago(app, p, { onDone, valor, fecha, medio: medioPre, cuenta: cuentaPre } = {}) {
   const c = calcular(p, today(), cfg());
   const cl = getCliente(p.clienteId);
   // Por defecto, el valor de la cuota pactada (o el saldo, si es menor).
@@ -465,6 +520,7 @@ export function abrirPago(app, p, { onDone, valor, fecha } = {}) {
       ${field('Fecha del pago', `<input type="date" name="fecha" value="${fecha || today()}" max="${today()}">`, 'Cámbiala si el pago fue otro día.')}
       ${moneyField('valor', 'Valor que paga', sug)}
       <div class="quick-amts">${chips.map(([t, v]) => `<button type="button" data-v="${v}">${esc(t)}</button>`).join('')}</div>
+      ${medioHtml(medioPre ? { medio: medioPre, cuenta: cuentaPre } : medioSugerido(p))}
       ${field('Nota', '<input name="nota" placeholder="Opcional">')}
       <div class="summary" data-res></div>
       <div class="btn-row"><button class="btn" data-ok="wa">${icon('chat', 'sm')} Guardar y avisar</button><button class="btn primary" data-ok="1">${icon('check', 'sm')} Guardar</button></div>`,
@@ -474,6 +530,7 @@ export function abrirPago(app, p, { onDone, valor, fecha } = {}) {
         afterLayers(() => abrirVariosPagos(app, p, { onDone }));
       });
       const inp = $('[name=valor]', el);
+      const medio = bindMedio(el);
       const upd = () => {
         const v = parseMoney(inp.value);
         const queda = c.saldo - v;
@@ -492,10 +549,11 @@ export function abrirPago(app, p, { onDone, valor, fecha } = {}) {
         const v = parseMoney(inp.value);
         if (!(v > 0)) return toast('Escribe el valor del pago', 'err');
         if (v > c.saldo) return toast('El pago no puede ser mayor que el saldo', 'err');
-        addMov(p, { tipo: 'pago', fecha: $('[name=fecha]', el).value || today(), valor: v, nota: $('[name=nota]', el).value.trim() });
+        const md = medio();
+        addMov(p, aplicarMedio({ tipo: 'pago', fecha: $('[name=fecha]', el).value || today(), valor: v, nota: $('[name=nota]', el).value.trim() }, md));
         await app.save();
         api.close();
-        toast(v >= c.saldo ? '¡Préstamo pagado completo!' : `Pago de ${money(v)} registrado`);
+        toast(v >= c.saldo ? '¡Préstamo pagado completo!' : `Pago de ${money(v)} registrado${md.medio ? ' · transferencia por retirar' : ''}`);
         if (b.dataset.ok === 'wa') enviarTexto(p);
         refreshLuego(app, onDone);
       }));
@@ -534,10 +592,12 @@ export function abrirVariosPagos(app, p, { onDone } = {}) {
       <div class="vp-head"><span></span><span>Fecha</span><span>Valor</span></div>
       <div data-filas>${filas.map(filaHtml).join('')}</div>
       <button type="button" class="btn ghost sm" data-agregar style="padding-left:0;margin:4px 0 12px">${icon('plus', 'sm')} Agregar otro pago</button>
+      ${medioHtml(medioSugerido(p))}
       <div class="summary" data-res></div>
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar pagos marcados</button>`,
     onMount(el, api) {
       const cont = $('[data-filas]', el);
+      const medio = bindMedio(el);
       const marcados = () => $$('.vp-row', cont).filter((r) => $('[data-chk]', r).checked)
         .map((r) => ({ fecha: $('[data-fecha]', r).value, valor: parseMoney($('[data-valor]', r).value) }));
       const upd = () => {
@@ -578,7 +638,7 @@ export function abrirVariosPagos(app, p, { onDone } = {}) {
         if (m.some((x) => x.fecha > hoy)) return toast('No puede haber pagos con fecha futura', 'err');
         const tot = m.reduce((s, x) => s + x.valor, 0);
         if (tot > c.saldo) return toast('Los pagos superan el saldo del préstamo', 'err');
-        m.sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).forEach((x, i) => addMov(p, { tipo: 'pago', fecha: x.fecha, valor: x.valor, nota: '', ts: Date.now() + i }));
+        m.sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).forEach((x, i) => addMov(p, aplicarMedio({ tipo: 'pago', fecha: x.fecha, valor: x.valor, nota: '', ts: Date.now() + i }, medio())));
         await app.save();
         api.close();
         toast(`${m.length} pago${m.length > 1 ? 's' : ''} registrado${m.length > 1 ? 's' : ''} · ${money(tot)}`);
@@ -697,6 +757,7 @@ export function abrirRenovacion(app, p) {
       <h3 style="font-size:13px;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin:4px 0 12px">Nuevas condiciones</h3>
       ${condicionesHtml(v0, { conCapital: false, labelFecha: 'Fecha del pago', despuesFecha: campoInicio })}
       ${interesRedondeableHtml('')}
+      ${medioHtml(medioSugerido(p))}
       <div class="summary" data-res></div>
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar y recalcular</button>`,
     onMount(el, api) {
@@ -705,6 +766,7 @@ export function abrirRenovacion(app, p) {
       const nuevoCap = () => c.saldo - pago();
       const inicio = () => q('inicio').value || q('fecha').value || today();
       const res = $('[data-res]', el);
+      const medio = bindMedio(el);
       let cond = null;
       const ir = bindInteresRedondeable(el, { capital: () => nuevoCap(), onChange: () => cond.recalc() });
       cond = bindCondiciones(el, {
@@ -742,13 +804,14 @@ export function abrirRenovacion(app, p) {
             cancel: 'No, usar Cobrar',
           });
           if (!ok) {
-            const prefill = { valor: pago(), fecha: x.fecha };
+            const md = medio();
+            const prefill = { valor: pago(), fecha: x.fecha, medio: md.medio || 'efectivo', cuenta: md.cuenta };
             api.close();
             afterLayers(() => abrirPago(app, p, prefill));
             return;
           }
         }
-        addMov(p, {
+        addMov(p, aplicarMedio({
           tipo: 'renovacion',
           fecha: x.fecha,
           valor: pago(),
@@ -758,7 +821,7 @@ export function abrirRenovacion(app, p) {
             inicio: inicio(), tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos,
             ...(ir.override(x.tasa) != null ? { interesFijo: ir.override(x.tasa), interesCalculado: ir.calc(x.tasa) } : {}),
           },
-        });
+        }, medio()));
         await app.save();
         api.close();
         toast(`Nuevo capital ${money(nc)} · cuotas recalculadas`);
@@ -872,6 +935,7 @@ function abrirMovimiento(app, p, m) {
     body: `${editable
       ? `${field('Fecha', `<input type="date" name="fecha" value="${m.fecha}">`)}
          ${moneyField('valor', m.tipo === 'ajuste' ? `Valor (${m.valor >= 0 ? 'suma' : 'resta'})` : 'Valor', Math.abs(m.valor))}
+         ${m.tipo === 'pago' ? medioHtml(m, { conRetiro: true }) : ''}
          ${field('Nota', `<input name="nota" value="${esc(m.nota || '')}">`)}
          <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar cambios</button><div style="height:10px"></div>`
       : `<div class="summary"><div class="r"><span>Fecha</span><b>${fdate(m.fecha)}</b></div>
@@ -879,15 +943,25 @@ function abrirMovimiento(app, p, m) {
           ${m.tipo === 'renovacion' ? `<div class="r"><span>Interés / abono</span><b>${money(m.interesPagado || 0)} / ${money(m.abonoCapital || 0)}</b></div>` : ''}
           ${m.tipo === 'renovacion' && m.ciclo?.inicio && m.ciclo.inicio !== m.fecha ? `<div class="r"><span>Nuevo periodo desde</span><b>${fdate(m.ciclo.inicio)}</b></div>` : ''}
           ${m.nota ? `<div class="r"><span>Nota</span><b>${esc(m.nota)}</b></div>` : ''}</div>
+          ${m.tipo === 'renovacion' ? `${medioHtml(m, { conRetiro: true })}<button class="btn block" data-medio style="margin-bottom:10px">${icon('check', 'sm')} Guardar cómo pagó</button>` : ''}
           <p class="small muted">${m.tipo === 'renovacion' ? 'Para cambiar las condiciones del ciclo usa “Editar”. Si lo eliminas, el préstamo vuelve a las condiciones anteriores.' : 'Si lo eliminas, la app volverá a avisarte de este interés.'}</p>`}
       <button class="btn danger block" data-del>${icon('trash', 'sm')} Eliminar movimiento</button>`,
     onMount(el, api) {
+      const medio = (m.tipo === 'pago' || m.tipo === 'renovacion') ? bindMedio(el) : null;
+      $('[data-medio]', el)?.addEventListener('click', async () => {
+        aplicarMedio(m, medio());
+        await app.save();
+        api.close();
+        toast('Guardado');
+        refreshLuego(app);
+      });
       $('[data-ok]', el)?.addEventListener('click', async () => {
         const v = parseMoney($('[name=valor]', el).value);
         if (!(v > 0)) return toast('Escribe el valor', 'err');
         m.fecha = $('[name=fecha]', el).value || m.fecha;
         m.valor = m.tipo === 'ajuste' && m.valor < 0 ? -v : v;
         m.nota = $('[name=nota]', el).value.trim();
+        if (medio) aplicarMedio(m, medio());
         await app.save();
         api.close();
         toast('Movimiento actualizado');

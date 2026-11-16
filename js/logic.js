@@ -247,6 +247,9 @@ export function resumenGeneral(state, hoy = today()) {
   const adicionales = sum(vigentes, (c) => c.adicionales) + adicionalesAnteriores;
   // Los adicionales anteriores (del Excel) ya se cobraron: cuentan como ganancia cobrada y entran al disponible.
   const gananciaCobrada = sum(calcs, (c) => c.gananciaCobrada) + adicionalesAnteriores;
+  const disponible = capitalBase + gananciaCobrada - enCalle - gastos - retiros - deudaSocios;
+  const pendientesTr = transferencias(state, hoy).filter((t) => t.pendiente);
+  const porRetirar = sum(pendientesTr, (t) => t.m.valor);
   return {
     interesesPrestamos,
     adicionales,
@@ -269,7 +272,11 @@ export function resumenGeneral(state, hoy = today()) {
     gananciaPactada: sum(calcs, (c) => c.interesesPactados),
     capitalBase,
     deudaSocios,
-    disponible: capitalBase + gananciaCobrada - enCalle - gastos - retiros - deudaSocios,
+    disponible,
+    // Pagos que llegaron por transferencia y siguen en la cuenta (Nequi, banco…): son parte del disponible.
+    porRetirar,
+    nPorRetirar: pendientesTr.length,
+    enEfectivo: disponible - porRetirar,
   };
 }
 
@@ -397,6 +404,25 @@ export function prestadoPorMes(state) {
 }
 
 // ---- Eliminar cartón de un préstamo pagado ----
+// ---- Pagos por transferencia ----
+export const esTransferencia = (m) => m?.medio === 'transferencia';
+/**
+ * Pagos de clientes que llegaron por transferencia (pagos e "interés + abono").
+ * pendiente = todavía no se ha sacado de la cuenta. Con `hasta`, se ve como estaba ese día.
+ */
+export function transferencias(state, hasta = null) {
+  const out = [];
+  for (const p of state.prestamos || []) {
+    if (p.estado === 'anulado') continue;
+    for (const m of p.movs || []) {
+      if ((m.tipo !== 'pago' && m.tipo !== 'renovacion') || !esTransferencia(m)) continue;
+      if (hasta && m.fecha > hasta) continue;
+      out.push({ p, m, pendiente: !m.retirado || (hasta != null && m.retirado > hasta) });
+    }
+  }
+  return out.sort((a, b) => (a.m.fecha < b.m.fecha ? 1 : a.m.fecha > b.m.fecha ? -1 : (b.m.ts || 0) - (a.m.ts || 0)));
+}
+
 /** ¿Se puede eliminar el cartón? Solo préstamos pagados que aún tienen el detalle de abonos. */
 export function puedeEliminarCarton(c) {
   // Con un solo movimiento (p. ej. el historial importado del Excel) no hay detalle que borrar.
@@ -420,7 +446,12 @@ export function eliminarCarton(p, c, hoy = today()) {
   const adicionales = (p.movs || []).filter((m) => m.tipo === 'interes' && !m.resumen).length;
   if (extra > 0) movs.push({ id: id(), ts: 1, tipo: 'interes', resumen: true, adicionales, fecha: fechaPago, valor: extra, nota: 'Intereses adicionales y renovaciones (resumen)' });
   if (extra < 0) movs.push({ id: id(), ts: 1, tipo: 'ajuste', resumen: true, fecha: fechaPago, valor: extra, nota: 'Descuentos (resumen)' });
-  movs.push({ id: id(), ts: 2, tipo: 'pago', fecha: fechaPago, valor: c.pagado, nota: 'Pagó todo (cartón eliminado)' });
+  // Las transferencias que aún no se sacan de la cuenta se conservan: siguen en la lista "por retirar".
+  const pendTr = (p.movs || []).filter((m) => (m.tipo === 'pago' || m.tipo === 'renovacion') && esTransferencia(m) && !m.retirado)
+    .map((m) => ({ id: m.id, ts: 3, tipo: 'pago', fecha: m.fecha, valor: m.valor, medio: 'transferencia', ...(m.cuenta ? { cuenta: m.cuenta } : {}), nota: 'Transferencia (por retirar)' }));
+  const resto = c.pagado - sum(pendTr, (m) => m.valor);
+  if (resto > 0) movs.push({ id: id(), ts: 2, tipo: 'pago', fecha: fechaPago, valor: resto, nota: 'Pagó todo (cartón eliminado)' });
+  movs.push(...pendTr);
   p.movs = movs;
   p.cartonEliminado = { fecha: hoy, movimientos: n };
   return p;

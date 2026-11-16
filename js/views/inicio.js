@@ -45,6 +45,11 @@ export function render(app) {
       <p>El plazo venció y siguen debiendo.</p><a class="btn sm" href="#/prestamos?filtro=interes">Revisar</a></div></div>`;
   }
 
+  if (r.porRetirar > 0) {
+    alertas += `<div class="alert info" data-href="#/transferencias" style="cursor:pointer">${icon('transfer')}<div class="grow"><b>${money(r.porRetirar)} en transferencias por retirar</b>
+      <p>${r.nPorRetirar} pago${r.nPorRetirar === 1 ? '' : 's'} que llegaron a la cuenta. Márcalos cuando los saques.</p></div>${icon('next', 'sm')}</div>`;
+  }
+
   main.innerHTML = `
     <p class="muted" style="margin:-4px 4px 12px">${esc(ffull(hoy).replace(/^./, (x) => x.toUpperCase()))}</p>
     <div class="hero">
@@ -93,5 +98,7 @@ export function render(app) {
     else if (q === 'gasto') abrirGasto(app);
     else if (q === 'cierre') app.go('#/cierre');
     if (e.target.closest('[data-respaldo]')) respaldo();
+    const h = e.target.closest('.alert[data-href]');
+    if (h) app.go(h.dataset.href);
   });
 }

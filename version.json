@@ -1,9 +1,9 @@
 {
-  "version": "1.16.0",
+  "version": "1.17.0",
   "fecha": "2026-11-16",
   "novedades": [
-    "Préstamos a socios sin interés: en Capital → el socio → Prestarle. Sale de la caja y queda como su deuda, con fecha.",
-    "Abonos del socio: eliges si paga en efectivo (entra a la caja), si se descuenta de su aporte o de su ganancia del mes.",
-    "La caja (Disponible), el informe para socios, el reporte PDF y el cierre del día ya incluyen las deudas de los socios."
+    "Al cobrar eliges cómo pagó: Efectivo o Transferencia (y la cuenta: Nequi, banco…). Si el cliente suele transferir, la app lo propone.",
+    "Nueva pantalla Más → Transferencias: lo que está en las cuentas por retirar. Marcas las que sacaste y pasan a “Retiradas” (no se suman otra vez).",
+    "Inicio avisa cuánto hay por retirar. El cierre del día separa el efectivo de las transferencias y Capital muestra cuánto de la caja está en cuentas."
   ]
 }

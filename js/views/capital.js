@@ -33,6 +33,7 @@ export function lista(app) {
     <div class="kpis">
       <div class="kpi"><div class="ico tone-ok">${icon('trending', 'sm')}</div><div class="v num">${money(r.gananciaCobrada)}</div><div class="l">Ganancia cobrada</div></div>
       <div class="kpi"><div class="ico tone-violet">${icon('coins', 'sm')}</div><div class="v num">${money(r.capitalBase + r.gananciaCobrada)}</div><div class="l">Capital + ganancias</div></div>
+      ${r.porRetirar ? `<a class="kpi" href="#/transferencias" style="grid-column:1/-1"><div class="ico tone-info">${icon('transfer', 'sm')}</div><div class="v num">${money(r.porRetirar)}</div><div class="l">De la caja, en cuentas por retirar (${r.nPorRetirar} transferencia${r.nPorRetirar === 1 ? '' : 's'}) · en efectivo ${money(r.enEfectivo)}</div></a>` : ''}
       ${r.deudaSocios ? `<div class="kpi" style="grid-column:1/-1"><div class="ico tone-warn">${icon('user', 'sm')}</div><div class="v num">${money(r.deudaSocios)}</div><div class="l">Le deben los socios (préstamos sin interés)</div></div>` : ''}
     </div>
     <a class="btn primary block" href="#/informe" style="margin-bottom:14px">${icon('file', 'sm')} Informe del mes para socios</a>

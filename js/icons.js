@@ -34,6 +34,7 @@ const P = {
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   trending: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+  transfer: '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
   card: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 9h4M6 13h12M6 16h8"/>',
   arrowIn: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
   arrowOut: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
