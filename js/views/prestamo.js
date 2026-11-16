@@ -30,22 +30,28 @@ function condicionesHtml(v, { conCapital = true, labelFecha = 'Fecha del présta
 }
 
 /** Enlaza el formulario de condiciones. getCapital() da el capital base cuando no hay campo de capital. */
-function bindCondiciones(el, { getCapital, onChange }) {
+function bindCondiciones(el, { getCapital, getInteres, onChange }) {
   let cuotaManual = false;
   let nManual = false;
-  const read = () => ({
-    fecha: el.querySelector('[name=fecha]')?.value || today(),
-    capital: el.querySelector('[name=capital]') ? parseMoney(el.querySelector('[name=capital]').value) : getCapital(),
-    modalidad: segValue(el, 'modalidad'),
-    tasa: parseNum(el.querySelector('[name=tasa]').value),
-    nCuotas: Math.max(1, parseInt(el.querySelector('[name=nCuotas]').value, 10) || 1),
-    valorCuota: parseMoney(el.querySelector('[name=valorCuota]').value),
-    cobraDomingos: el.querySelector('[name=cobraDomingos]').checked,
-  });
+  const read = () => {
+    const v = {
+      fecha: el.querySelector('[name=fecha]')?.value || today(),
+      capital: el.querySelector('[name=capital]') ? parseMoney(el.querySelector('[name=capital]').value) : getCapital(),
+      modalidad: segValue(el, 'modalidad'),
+      tasa: parseNum(el.querySelector('[name=tasa]').value),
+      nCuotas: Math.max(1, parseInt(el.querySelector('[name=nCuotas]').value, 10) || 1),
+      valorCuota: parseMoney(el.querySelector('[name=valorCuota]').value),
+      cobraDomingos: el.querySelector('[name=cobraDomingos]').checked,
+    };
+    // Interés redondeado a mano (solo en renovaciones). undefined = sale del porcentaje.
+    const fijo = getInteres?.(v.tasa, v.capital);
+    if (fijo != null) v.interes = fijo;
+    return v;
+  };
   const recalc = () => {
     const v = read();
     if (!cuotaManual) {
-      const vc = cuotaSugerida(v.capital, v.tasa, v.nCuotas);
+      const vc = cuotaSugerida(v.capital, v.tasa, v.nCuotas, v.interes);
       el.querySelector('[name=valorCuota]').value = vc ? num(vc) : '';
     }
     onChange?.(read());
@@ -67,19 +73,68 @@ const PLURAL = { Diario: 'diarias', Semanal: 'semanales', Quincenal: 'quincenale
 const SINGULAR = { Diario: 'diaria', Semanal: 'semanal', Quincenal: 'quincenal', Mensual: 'mensual' };
 
 function resumenCondiciones(v, capital = v.capital) {
-  const interes = interesDe(capital, v.tasa);
+  const calculado = interesDe(capital, v.tasa);
+  const interes = v.interes ?? calculado;
   const total = capital + interes;
   const fechas = generarFechas(v.fecha, v.modalidad, v.nCuotas, v.cobraDomingos);
   const ultimo = total - v.valorCuota * (v.nCuotas - 1);
   return `
     <div class="r"><span>Capital</span><b>${money(capital)}</b></div>
-    <div class="r"><span>Interés ${num(v.tasa)}%</span><b>${money(interes)}</b></div>
+    ${interes !== calculado
+      ? `<div class="r"><span>Interés ${num(v.tasa)}% calculado</span><b>${money(calculado)}</b></div>
+         <div class="r"><span>Interés redondeado</span><b>${money(interes)}</b></div>`
+      : `<div class="r"><span>Interés ${num(v.tasa)}%</span><b>${money(interes)}</b></div>`}
     <div class="r"><span>${v.nCuotas} ${v.nCuotas > 1 ? `cuotas ${PLURAL[v.modalidad]}` : `cuota ${SINGULAR[v.modalidad]}`} de</span><b>${money(v.valorCuota)}</b></div>
     ${v.nCuotas > 1 && v.valorCuota && ultimo !== v.valorCuota && ultimo > 0 ? `<div class="r small muted"><span>Última cuota</span><span>${money(ultimo)}</span></div>` : ''}
     <div class="r"><span>Primer cobro</span><b>${fdate(fechas[0])}</b></div>
     <div class="r"><span>Fin del plazo</span><b>${fdate(fechas[fechas.length - 1])}</b></div>
     <div class="r total"><span>Total a pagar</span><b>${money(total)}</b></div>
     ${v.valorCuota * v.nCuotas < total ? `<div class="r small" style="color:var(--warn)"><span>Las cuotas no alcanzan el total</span><span>faltan ${money(total - v.valorCuota * v.nCuotas)}</span></div>` : ''}`;
+}
+
+// ---- Interés del periodo con redondeo (renovaciones) ----
+const abajo = (x, m) => Math.floor(x / m) * m;
+
+function interesRedondeableHtml(valor) {
+  return `${moneyField('interesNuevo', 'Interés del nuevo periodo', valor, 'Sale del porcentaje; puedes redondearlo.')}
+    <div class="field" style="margin-top:-6px"><span class="lbl">Redondear</span><div class="quick-amts" data-red-int style="margin:0"></div></div>`;
+}
+
+/**
+ * Enlaza el campo "Interés del nuevo periodo". capital() da el capital del ciclo nuevo.
+ * fijoInicial: interés ya redondeado (al editar). onChange se llama al cambiarlo.
+ */
+function bindInteresRedondeable(el, { capital, fijoInicial = null, onChange }) {
+  let manual = fijoInicial != null;
+  const inp = $('[name=interesNuevo]', el);
+  const box = $('[data-red-int]', el);
+  const calc = (tasa) => interesDe(Math.max(0, capital()), tasa);
+  const valor = (tasa) => (manual ? parseMoney(inp.value) : calc(tasa));
+  const override = (tasa) => (manual && parseMoney(inp.value) !== calc(tasa) ? parseMoney(inp.value) : undefined);
+  const pintar = (tasa) => {
+    const c0 = calc(tasa);
+    if (!manual) inp.value = num(c0);
+    const v = valor(tasa);
+    const cap = Math.max(0, capital());
+    const ops = [];
+    const add = (label, val) => { if (val > 0 && val < c0 && !ops.some((o) => o.val === val)) ops.push({ label, val }); };
+    add(`Interés ${money(abajo(c0, 1000))}`, abajo(c0, 1000));
+    add(`Interés ${money(abajo(c0, 10000))}`, abajo(c0, 10000));
+    add(`Total ${money(abajo(cap + c0, 10000))}`, abajo(cap + c0, 10000) - cap);
+    add(`Total ${money(abajo(cap + c0, 50000))}`, abajo(cap + c0, 50000) - cap);
+    box.innerHTML = ops.map((o) => `<button type="button" data-v="${o.val}" ${o.val === v ? 'style="border-style:solid;border-color:var(--primary);color:var(--primary-strong)"' : ''}>${esc(o.label)}</button>`).join('')
+      + (v !== c0 ? `<button type="button" data-sin>Sin redondear ${money(c0)}</button>` : '')
+      || '<span class="small muted">El interés ya está redondo.</span>';
+  };
+  inp.addEventListener('input', () => { manual = true; onChange(); });
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.hasAttribute('data-sin')) manual = false;
+    else { manual = true; inp.value = num(+b.dataset.v); }
+    onChange();
+  });
+  return { valor, override, pintar, calc };
 }
 
 // =====================================================================
@@ -627,6 +682,7 @@ export function abrirRenovacion(app, p) {
       </div>
       <h3 style="font-size:13px;color:var(--text-2);text-transform:uppercase;letter-spacing:.06em;margin:4px 0 12px">Nuevas condiciones</h3>
       ${condicionesHtml(v0, { conCapital: false, labelFecha: 'Fecha del pago', despuesFecha: campoInicio })}
+      ${interesRedondeableHtml('')}
       <div class="summary" data-res></div>
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar y recalcular</button>`,
     onMount(el, api) {
@@ -635,15 +691,19 @@ export function abrirRenovacion(app, p) {
       const nuevoCap = () => c.saldo - pago();
       const inicio = () => q('inicio').value || q('fecha').value || today();
       const res = $('[data-res]', el);
-      const cond = bindCondiciones(el, {
+      let cond = null;
+      const ir = bindInteresRedondeable(el, { capital: () => nuevoCap(), onChange: () => cond.recalc() });
+      cond = bindCondiciones(el, {
         getCapital: () => Math.max(0, nuevoCap()),
+        getInteres: (tasa) => ir.override(tasa),
         onChange: (x) => {
           const nc = nuevoCap();
+          ir.pintar(x.tasa);
           res.innerHTML = nc <= 0
             ? `<div class="r" style="color:var(--warn)"><span>Con ese pago queda a paz y salvo. Usa “Cobrar”.</span></div>`
             : `<div class="r"><span>Paga hoy</span><b style="color:var(--ok)">${money(pago())}</b></div>
                <div class="r"><span>Nuevo capital</span><b>${money(nc)}</b></div>${resumenCondiciones({ ...x, fecha: inicio() }, nc).replace(/<div class="r"><span>Capital<\/span>.*?<\/div>/, '')}
-               <div class="r small" style="color:var(--warn);display:block;line-height:1.4">⚠️ Esto abre <b>otro periodo</b> y le suma un <b>interés nuevo de ${money(interesDe(nc, x.tasa))}</b>. Si el cliente está <b>terminando de pagar</b> la deuda (en una o varias partes), cierra esto y usa <b>Cobrar</b>.</div>`;
+               <div class="r small" style="color:var(--warn);display:block;line-height:1.4">⚠️ Esto abre <b>otro periodo</b> y le suma un <b>interés nuevo de ${money(ir.valor(x.tasa))}</b>. Si el cliente está <b>terminando de pagar</b> la deuda (en una o varias partes), cierra esto y usa <b>Cobrar</b>.</div>`;
         },
       });
       // Si cambia la fecha del pago, se vuelve a sugerir el inicio (salvo que el usuario lo haya cambiado a mano).
@@ -660,7 +720,7 @@ export function abrirRenovacion(app, p) {
         if (!(x.valorCuota > 0)) return toast('Revisa el valor de la cuota', 'err');
         // Si además abona a capital, confirmar: puede ser que en realidad esté terminando de pagar en partes.
         if (parseMoney(q('abonoCapital').value) > 0) {
-          const nuevoInt = interesDe(nc, x.tasa);
+          const nuevoInt = ir.valor(x.tasa);
           const ok = await confirmDialog({
             title: '¿El cliente sigue con el préstamo otro periodo?',
             text: `Va a quedar debiendo <b>${money(nc + nuevoInt)}</b>: capital ${money(nc)} + interés nuevo ${money(nuevoInt)}.<br><br>Si está <b>terminando de pagar</b> la deuda en partes, toca “No, usar Cobrar”: así no se le suma interés nuevo.`,
@@ -680,7 +740,10 @@ export function abrirRenovacion(app, p) {
           valor: pago(),
           interesPagado: parseMoney(q('interesPagado').value),
           abonoCapital: parseMoney(q('abonoCapital').value),
-          ciclo: { inicio: inicio(), tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos },
+          ciclo: {
+            inicio: inicio(), tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos,
+            ...(ir.override(x.tasa) != null ? { interesFijo: ir.override(x.tasa), interesCalculado: ir.calc(x.tasa) } : {}),
+          },
         });
         await app.save();
         api.close();
@@ -704,6 +767,7 @@ export function abrirEditar(app, p) {
     body: `${ref ? `<p class="small muted" style="margin-top:-6px">Este préstamo fue renovado el ${fdate(ref.fecha)}. Aquí cambias las condiciones del ciclo actual (capital ${money(c.ciclo.capital)}).</p>` : ''}
       ${condicionesHtml(v, { conCapital: !ref, labelFecha: ref ? 'Fecha de la renovación (pago)' : 'Fecha del préstamo',
         despuesFecha: ref ? field('El periodo cuenta desde', `<input type="date" name="inicio" value="${esc(v.inicio)}">`, 'De aquí salen las fechas de cobro de este ciclo.') : '' })}
+      ${ref ? interesRedondeableHtml(ref.ciclo?.interesFijo ?? c.ciclo.interes) : ''}
       ${!ref ? field('Notas', `<textarea name="notas">${esc(p.notas || '')}</textarea>`) : ''}
       ${!ref ? `<div class="field"><label>Cliente</label><select name="cliente" class="input">${[...store.state.clientes].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map((x) => `<option value="${x.id}" ${x.id === p.clienteId ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
       <div class="summary" data-res></div>
@@ -711,7 +775,16 @@ export function abrirEditar(app, p) {
     onMount(el, api) {
       const res = $('[data-res]', el);
       const inicioEl = el.querySelector('[name=inicio]');
-      const cond = bindCondiciones(el, { getCapital: () => c.ciclo.capital, onChange: (x) => (res.innerHTML = resumenCondiciones(inicioEl ? { ...x, fecha: inicioEl.value || x.fecha } : x)) });
+      let cond = null;
+      const ir = ref ? bindInteresRedondeable(el, { capital: () => c.ciclo.capital, fijoInicial: ref.ciclo?.interesFijo ?? null, onChange: () => cond.recalc() }) : null;
+      cond = bindCondiciones(el, {
+        getCapital: () => c.ciclo.capital,
+        getInteres: ir ? (tasa) => ir.override(tasa) : undefined,
+        onChange: (x) => {
+          ir?.pintar(x.tasa);
+          res.innerHTML = resumenCondiciones(inicioEl ? { ...x, fecha: inicioEl.value || x.fecha } : x);
+        },
+      });
       inicioEl?.addEventListener('input', () => cond.recalc());
       cond.setManual(true); // respeta la cuota guardada; si cambian datos, el usuario la ajusta o la borra
       el.querySelector('[name=valorCuota]').insertAdjacentHTML('afterend', '<button type="button" class="btn ghost sm" data-auto style="justify-self:start;padding-left:0">Recalcular cuota automáticamente</button>');
@@ -722,7 +795,10 @@ export function abrirEditar(app, p) {
         if (!(x.valorCuota > 0)) return toast('Revisa el valor de la cuota', 'err');
         if (ref) {
           ref.fecha = x.fecha;
-          ref.ciclo = { inicio: inicioEl.value || x.fecha, tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos };
+          ref.ciclo = {
+            inicio: inicioEl.value || x.fecha, tasa: x.tasa, nCuotas: x.nCuotas, valorCuota: x.valorCuota, modalidad: x.modalidad, cobraDomingos: x.cobraDomingos,
+            ...(ir.override(x.tasa) != null ? { interesFijo: ir.override(x.tasa), interesCalculado: ir.calc(x.tasa) } : {}),
+          };
         } else {
           if (!(x.capital > 0)) return toast('Escribe el capital', 'err');
           Object.assign(p, x, { notas: $('[name=notas]', el).value.trim(), clienteId: $('[name=cliente]', el).value || p.clienteId });

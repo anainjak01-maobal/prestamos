@@ -25,8 +25,8 @@ export const ESTADOS = {
 export const interesDe = (capital, tasa) => Math.round((capital * tasa) / 100);
 
 /** Cuota sugerida: total / n, redondeada hacia arriba a múltiplos de 100. */
-export function cuotaSugerida(capital, tasa, n) {
-  const total = capital + interesDe(capital, tasa);
+export function cuotaSugerida(capital, tasa, n, interes) {
+  const total = capital + (interes ?? interesDe(capital, tasa));
   if (!n || n < 1) return total;
   const c = total / n;
   return total >= 10000 ? Math.ceil(c / 100) * 100 : Math.ceil(c);
@@ -66,7 +66,8 @@ export function fechaInteresAdicional(fechaFin, k) {
 export function calcular(p, hoy = today(), cfg = {}) {
   const movs = [...(p.movs || [])].sort(ordenMovs);
   const mkCiclo = (inicio, capital, d, ref) => {
-    const interes = interesDe(capital, d.tasa);
+    // interesFijo: interés redondeado a mano en una renovación (si no, sale del porcentaje).
+    const interes = d.interesFijo != null ? Math.max(0, Math.round(d.interesFijo)) : interesDe(capital, d.tasa);
     return {
       inicio, capital, tasa: d.tasa, nCuotas: d.nCuotas, valorCuota: d.valorCuota,
       modalidad: d.modalidad, cobraDomingos: d.cobraDomingos !== false,
@@ -100,7 +101,9 @@ export function calcular(p, hoy = today(), cfg = {}) {
       const nc = mkCiclo(m.ciclo?.inicio || m.fecha, Math.max(0, saldo), m.ciclo || p, m);
       ciclos.push(nc);
       saldo = nc.total;
-      lineas.push({ fecha: m.fecha, tipo: 'renovacion', cargo: nc.interes, saldo, nota: `Nuevo capital ${nc.capital.toLocaleString('es-CO')} + ${nc.tasa}% interés`, mov: m });
+      lineas.push({ fecha: m.fecha, tipo: 'renovacion', cargo: nc.interes, saldo, nota: m.ciclo?.interesFijo != null
+        ? `Nuevo capital ${nc.capital.toLocaleString('es-CO')} + interés ${nc.interes.toLocaleString('es-CO')} (redondeado)`
+        : `Nuevo capital ${nc.capital.toLocaleString('es-CO')} + ${nc.tasa}% interés`, mov: m });
     }
   }
 
