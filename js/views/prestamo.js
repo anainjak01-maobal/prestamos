@@ -532,30 +532,68 @@ export function abrirInteres(app, p, pendiente = null) {
         ${field('Fecha', `<input type="date" name="fecha" value="${pendiente?.fecha || today()}">`)}
       </div>
       ${moneyField('base', 'Sobre el saldo de', c.saldo)}
-      ${moneyField('valor', 'Valor del interés', interesDe(c.saldo, pct0), 'Se calcula solo; puedes cambiarlo.')}
-      ${field('Nota', `<input name="nota" value="">`)}
+      ${moneyField('valor', 'Valor del interés', interesDe(c.saldo, pct0), 'Se calcula solo; puedes cambiarlo o redondearlo.')}
+      ${moneyField('nuevoSaldo', 'Nuevo saldo (puedes redondearlo)', c.saldo + interesDe(c.saldo, pct0), 'Escribe el total que le vas a dejar y la app ajusta el interés.')}
+      <div class="field" style="margin-top:-6px"><span class="lbl">Redondear</span><div class="quick-amts" data-redondeo style="margin:0"></div></div>
+      ${field('Nota', `<input name="nota" value="" placeholder="Se llena sola si la dejas vacía">`)}
       <div class="summary" data-res></div>
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Aplicar interés</button>`,
     onMount(el, api) {
       let manual = false;
       const q = (n) => $(`[name=${n}]`, el);
-      const upd = () => {
-        const pct = parseNum(q('pct').value), base = parseMoney(q('base').value);
-        if (!manual) q('valor').value = num(interesDe(base, pct));
+      const calculado = () => interesDe(parseMoney(q('base').value), parseNum(q('pct').value));
+      const abajo = (x, m) => Math.floor(x / m) * m;
+      const opcionesRedondeo = (calc) => {
+        const ops = [];
+        const add = (label, valor) => {
+          if (valor > 0 && valor < calc && !ops.some((o) => o.valor === valor)) ops.push({ label, valor });
+        };
+        add(`Interés ${money(abajo(calc, 1000))}`, abajo(calc, 1000));
+        add(`Interés ${money(abajo(calc, 10000))}`, abajo(calc, 10000));
+        const saldo10 = abajo(c.saldo + calc, 10000);
+        add(`Saldo ${money(saldo10)}`, saldo10 - c.saldo);
+        const saldo50 = abajo(c.saldo + calc, 50000);
+        add(`Saldo ${money(saldo50)}`, saldo50 - c.saldo);
+        return ops;
+      };
+      const upd = (desde = '') => {
+        const pct = parseNum(q('pct').value);
+        const calc = calculado();
+        if (!manual) q('valor').value = num(calc);
+        if (desde === 'saldo') q('valor').value = num(Math.max(0, parseMoney(q('nuevoSaldo').value) - c.saldo));
         const v = parseMoney(q('valor').value);
+        if (desde !== 'saldo') q('nuevoSaldo').value = num(c.saldo + v);
+        const ops = opcionesRedondeo(calc);
+        $('[data-redondeo]', el).innerHTML = ops.map((o) => `<button type="button" data-v="${o.valor}" ${o.valor === v ? 'style="border-style:solid;border-color:var(--primary);color:var(--primary-strong)"' : ''}>${esc(o.label)}</button>`).join('')
+          + (v !== calc ? `<button type="button" data-v="${calc}">Sin redondear ${money(calc)}</button>` : '')
+          || '<span class="small muted">El valor ya está redondo.</span>';
+        const descuento = calc - v;
         $('[data-res]', el).innerHTML = `<div class="r"><span>Saldo actual</span><b>${money(c.saldo)}</b></div>
-          <div class="r"><span>Interés ${num(pct)}%</span><b style="color:var(--danger)">+ ${money(v)}</b></div>
+          <div class="r"><span>Interés ${num(pct)}% calculado</span><b>${money(calc)}</b></div>
+          ${descuento > 0 ? `<div class="r"><span>Rebaja por redondeo</span><b style="color:var(--ok)">− ${money(descuento)}</b></div>` : ''}
+          ${descuento < 0 ? `<div class="r"><span>Cobras de más</span><b style="color:var(--warn)">+ ${money(-descuento)}</b></div>` : ''}
+          <div class="r"><span>Se suma al saldo</span><b style="color:var(--danger)">+ ${money(v)}</b></div>
           <div class="r total"><span>Nuevo saldo</span><b>${money(c.saldo + v)}</b></div>`;
       };
-      q('valor').addEventListener('input', () => { manual = true; upd(); });
+      q('valor').addEventListener('input', () => { manual = true; upd('valor'); });
+      q('nuevoSaldo').addEventListener('input', () => { manual = true; upd('saldo'); });
       q('pct').addEventListener('input', () => { manual = false; upd(); });
       q('base').addEventListener('input', () => { manual = false; upd(); });
+      $('[data-redondeo]', el).addEventListener('click', (e) => {
+        const b = e.target.closest('[data-v]');
+        if (!b) return;
+        manual = true;
+        q('valor').value = num(+b.dataset.v);
+        upd('valor');
+      });
       upd();
       $('[data-ok]', el).onclick = async () => {
         const v = parseMoney(q('valor').value), pct = parseNum(q('pct').value), base = parseMoney(q('base').value);
         if (!(v > 0)) return toast('El valor del interés debe ser mayor que 0', 'err');
-        const nota = q('nota').value.trim() || `Interés adicional ${num(pct)}% sobre ${money(base)}`;
-        addMov(p, { tipo: 'interes', fecha: q('fecha').value || today(), valor: v, pct, base, nota });
+        const calc = calculado();
+        const redondeo = v !== calc ? ` (calculado ${money(calc)}, ${v < calc ? 'redondeado' : 'ajustado'} a ${money(v)})` : '';
+        const nota = q('nota').value.trim() || `Interés adicional ${num(pct)}% sobre ${money(base)}${redondeo}`;
+        addMov(p, { tipo: 'interes', fecha: q('fecha').value || today(), valor: v, pct, base, calculado: calc, nota });
         await app.save();
         api.close();
         toast(`Interés de ${money(v)} aplicado`);

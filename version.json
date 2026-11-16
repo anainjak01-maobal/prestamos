@@ -1,10 +1,9 @@
 {
-  "version": "1.12.0",
-  "fecha": "2026-11-12",
+  "version": "1.13.0",
+  "fecha": "2026-11-16",
   "novedades": [
-    "Nuevo: “Por vencer” en Inicio. Muestra los préstamos cuyo plazo se cumple en los próximos 7 días, con cuánto deben y cuánto son solo los intereses (mensual y quincenal).",
-    "En Préstamos hay un filtro nuevo, “Por vencer”, con la lista completa.",
-    "Con el botón verde de WhatsApp le mandas al cliente un recordatorio antes de la fecha (puedes cambiar el texto).",
-    "En Más → Ajustes puedes cambiar cuántos días antes quieres ver los plazos por vencer."
+    "Interés adicional con redondeo: si el cálculo da $222.000 puedes dejarlo en $220.000 con un toque.",
+    "También puedes escribir directamente el nuevo saldo que le vas a dejar al cliente y la app ajusta el interés.",
+    "La nota del movimiento guarda cuánto daba el cálculo y a cuánto lo redondeaste."
   ]
 }
