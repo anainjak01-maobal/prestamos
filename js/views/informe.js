@@ -23,7 +23,8 @@ export function render(app, _p, query) {
   const itemSocio = (x) => `<div class="item" data-desc="${x.socio.id}">
       <div class="avatar ${avatarTone(x.socio.nombre)}">${esc(initials(x.socio.nombre))}</div>
       <div class="grow"><div class="t ellipsis">${esc(x.socio.nombre)} · ${pctTxt(x.pct)}</div>
-        <div class="s">Ganancia ${money(x.parteGanancia)}${x.retirosGanancia ? ` · retiró − ${money(x.retirosGanancia)}` : ''}${x.descuento ? ` · deuda − ${money(x.descuento)}` : ' · toca para descontar deuda'}</div></div>
+        <div class="s">Ganancia ${money(x.parteGanancia)}${x.retirosGanancia ? ` · retiró − ${money(x.retirosGanancia)}` : ''}${x.descuento ? ` · deuda − ${money(x.descuento)}` : ' · toca para descontar deuda'}</div>
+        ${x.deuda > 0 ? `<div class="s" style="color:var(--warn);font-weight:650">Le debe al negocio ${money(x.deuda)}</div>` : ''}</div>
       <div class="end"><span class="amt num" style="color:${x.aRecibir < 0 ? 'var(--danger)' : 'var(--ok)'}">${money(x.aRecibir)}</span><span class="small muted">a recibir</span></div></div>`;
 
   main.innerHTML = `
@@ -70,10 +71,12 @@ export function render(app, _p, query) {
         ${fila('<b>Ganancia neta a repartir</b>', `<b>${money(i.aRepartir)}</b>`)}
         ${fila('Ganancia ya cobrada', money(i.gananciaCobrada), 'style="color:var(--ok)"')}
         ${fila('Retiros de ganancia', '− ' + money(i.retiros), 'style="color:var(--violet)"')}
+        ${i.prestadoSocios ? fila('Préstamos a socios', '− ' + money(i.prestadoSocios), 'style="color:var(--warn)"') : ''}
+        ${i.abonosSociosCaja ? fila('Abonos de socios', '+ ' + money(i.abonosSociosCaja), 'style="color:var(--ok)"') : ''}
         ${fila('Préstamos terminados', i.terminados)}
         ${fila('<b>Flujo de caja</b>', `<b>${i.flujo > 0 ? '+' : ''}${money(i.flujo)}</b>`, `style="color:${i.flujo < 0 ? 'var(--danger)' : 'var(--ok)'}"`)}
       </dl>
-      <p class="tiny muted" style="margin:8px 0 0">Flujo de caja = cobrado − prestado − gastos − retiros: el efectivo que entró (+) o salió (−).</p>
+      <p class="tiny muted" style="margin:8px 0 0">Flujo de caja = cobrado − prestado − gastos − retiros − préstamos a socios + abonos de socios: el efectivo que entró (+) o salió (−).</p>
     </div>
 
     <div class="card"><h3>Estado al ${esc(fdate(i.corte))}</h3>
@@ -81,13 +84,20 @@ export function render(app, _p, query) {
         ${fila('Capital base', money(r.capitalBase))}
         ${fila('Dinero en la calle', money(r.enCalle))}
         ${fila('<b>Total deuda por cobrar</b>', `<b>${money(r.porCobrar)}</b>`)}
-        ${fila('Disponible', money(r.disponible), 'style="color:var(--ok)"')}
+        ${r.deudaSocios ? fila('Le deben los socios', money(r.deudaSocios), 'style="color:var(--warn)"') : ''}
+        ${fila('Disponible (caja)', money(r.disponible), 'style="color:var(--ok)"')}
         ${fila('Ganancia + adicionales', money(r.gananciaTotal))}
         ${fila('Ganancia + capital', money(r.gananciaMasCapital))}
         ${fila(`En riesgo <span class="small muted">(${i.riesgo.nAtrasados} atrasados, ${i.riesgo.nVencidos} vencidos)</span>`, `${money(i.riesgo.saldoEnRiesgo)} <span class="small muted">${pctTxt(i.riesgo.pct)}</span>`, 'style="color:var(--warn)"')}
       </dl>
       <p class="tiny muted" style="margin:8px 0 0">Ganancias acumuladas desde el inicio. ${i.enCurso ? 'El mes no ha terminado: las cifras son a hoy.' : ''}</p>
     </div>
+
+    ${i.socios.some((x) => x.deuda > 0 || x.prestadoSocio || x.abonadoSocio) ? `<div class="section-title">Deudas de los socios <span class="muted">sin interés</span></div>
+      <div class="list">${i.socios.filter((x) => x.deuda > 0 || x.prestadoSocio || x.abonadoSocio).map((x) => `<div class="item" data-href="#/socio/${x.socio.id}">
+        <div class="avatar ${avatarTone(x.socio.nombre)}">${esc(initials(x.socio.nombre))}</div>
+        <div class="grow"><div class="t ellipsis">${esc(x.socio.nombre)}</div><div class="s">${[x.prestadoSocio ? `se le prestó ${money(x.prestadoSocio)}` : '', x.abonadoSocio ? `abonó ${money(x.abonadoSocio)}` : ''].filter(Boolean).join(' · ') || 'sin movimiento este mes'}</div></div>
+        <div class="end"><span class="amt num" style="color:${x.deuda > 0 ? 'var(--warn)' : 'var(--ok)'}">${money(x.deuda)}</span><span class="small muted">debe</span></div></div>`).join('')}</div>` : ''}
 
     ${guardan.length ? `<div class="section-title">Dinero guardado y otros aportes</div>
       <div class="list">${guardan.map((x) => `<div class="item" data-href="#/socio/${x.socio.id}">
@@ -117,6 +127,7 @@ function abrirDescuento(app, x, mes) {
         <div class="r"><span>Ganancia de ${esc(nombreMes(mes).toLowerCase())}</span><b>${money(x.parteGanancia)}</b></div>
         ${x.retirosGanancia ? `<div class="r"><span>Retiros de ganancia del mes</span><b>− ${money(x.retirosGanancia)}</b></div>` : ''}
       </div>
+      ${x.deuda > 0 ? `<div class="alert info">${icon('info')}<div class="grow small">${esc(so.nombre)} tiene una deuda registrada en la app de <b>${money(x.deuda)}</b>. Para descontarla de su ganancia usa <b>Capital → ${esc(so.nombre)} → Recibir abono → De su ganancia</b>: así baja su deuda y se le resta aquí sola. Este campo es para deudas que se llevan en el cuaderno.</div></div>` : ''}
       ${moneyField('valor', 'Valor que debe y se le descuenta', actual?.valor || '', 'Déjalo vacío o en 0 si no debe nada este mes.')}
       ${field('Nota', `<input name="nota" value="${esc(actual?.nota || '')}" placeholder="Ej: préstamo del 24/06 (cuaderno)">`)}
       <div class="summary" data-res></div>
@@ -168,18 +179,26 @@ async function compartir(i, mes) {
     `Cobrado: ${money(i.cobrado)} (${i.nPagos} pago${i.nPagos === 1 ? '' : 's'})`,
     `Ganancia ya cobrada: ${money(i.gananciaCobrada)}`,
     `Retiros de ganancia: − ${money(i.retiros)}`,
+    ...(i.prestadoSocios ? [`Préstamos a socios: − ${money(i.prestadoSocios)}`] : []),
+    ...(i.abonosSociosCaja ? [`Abonos de socios: + ${money(i.abonosSociosCaja)}`] : []),
     `Préstamos terminados: ${i.terminados}`,
-    `*Flujo de caja: ${i.flujo > 0 ? '+' : ''}${money(i.flujo)}* (cobrado − prestado − gastos − retiros)`,
+    `*Flujo de caja: ${i.flujo > 0 ? '+' : ''}${money(i.flujo)}*`,
     '',
     `*Estado al ${fdate(i.corte)}*`,
     `Capital base: ${money(r.capitalBase)}`,
     `Dinero en la calle: ${money(r.enCalle)}`,
     `Total deuda por cobrar: ${money(r.porCobrar)}`,
-    `Disponible: ${money(r.disponible)}`,
+    ...(r.deudaSocios ? [`Le deben los socios: ${money(r.deudaSocios)}`] : []),
+    `Disponible (caja): ${money(r.disponible)}`,
     `Ganancia + adicionales (acumulada): ${money(r.gananciaTotal)}`,
     `Ganancia + capital: ${money(r.gananciaMasCapital)}`,
     `En riesgo: ${money(i.riesgo.saldoEnRiesgo)} (${pctTxt(i.riesgo.pct)} de la deuda · ${i.riesgo.nAtrasados} atrasados, ${i.riesgo.nVencidos} con plazo vencido)`,
   );
+  const conDeuda = i.socios.filter((x) => x.deuda > 0);
+  if (conDeuda.length) {
+    t.push('', '*Deudas de los socios (sin interés)*');
+    conDeuda.forEach((x) => t.push(`• ${x.socio.nombre}: debe ${money(x.deuda)}`));
+  }
   const guardan = i.socios.filter((x) => !x.participa && x.socio.pctGanancia !== undefined);
   if (guardan.length) {
     t.push('', '*Dinero guardado (sin ganancia)*');

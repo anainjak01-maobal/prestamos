@@ -1,9 +1,9 @@
 {
-  "version": "1.15.0",
+  "version": "1.16.0",
   "fecha": "2026-11-16",
   "novedades": [
-    "Nuevo préstamo: ahora puedes redondear el interés (por ejemplo de $222.000 a $220.000) con un toque o escribiéndolo.",
-    "La cuota y el total se recalculan con el interés redondeado.",
-    "En Editar préstamo también puedes cambiar el redondeo o volver al valor calculado."
+    "Préstamos a socios sin interés: en Capital → el socio → Prestarle. Sale de la caja y queda como su deuda, con fecha.",
+    "Abonos del socio: eliges si paga en efectivo (entra a la caja), si se descuenta de su aporte o de su ganancia del mes.",
+    "La caja (Disponible), el informe para socios, el reporte PDF y el cierre del día ya incluyen las deudas de los socios."
   ]
 }

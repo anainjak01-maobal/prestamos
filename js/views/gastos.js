@@ -60,6 +60,12 @@ export function lista(app, _p, query) {
 
 /** Formulario para registrar o editar un gasto o retiro. */
 export function abrirGasto(app, g = null, { tipo: tipoInicial = 'gasto' } = {}) {
+  // Los retiros creados por un abono de un socio a su deuda se editan desde la ficha del socio.
+  if (g?.deudaId) {
+    toast('Este retiro es el abono de un socio a su deuda. Edítalo en Capital → el socio.', 'err');
+    if (g.socioId) app.go(`#/socio/${g.socioId}`);
+    return;
+  }
   const tipo0 = g?.tipo || tipoInicial;
   sheet({
     title: g ? 'Editar movimiento' : 'Registrar gasto o retiro',

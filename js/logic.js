@@ -234,6 +234,8 @@ export function resumenGeneral(state, hoy = today()) {
     }
   }
   const capitalBase = sum(state.socios, (s) => saldoSocio(s));
+  // Lo que los socios le deben al negocio: es dinero que salió de la caja.
+  const deudaSocios = sum(state.socios, (s) => saldoDeudaSocio(s));
   const enCalle = sum(activos, (c) => c.capitalPendiente);
   const gastos = sum((state.gastos || []).filter((g) => g.tipo !== 'retiro'), (g) => g.valor);
   const retiros = sum((state.gastos || []).filter((g) => g.tipo === 'retiro'), (g) => g.valor);
@@ -266,7 +268,8 @@ export function resumenGeneral(state, hoy = today()) {
     gananciaCobrada,
     gananciaPactada: sum(calcs, (c) => c.interesesPactados),
     capitalBase,
-    disponible: capitalBase + gananciaCobrada - enCalle - gastos - retiros,
+    deudaSocios,
+    disponible: capitalBase + gananciaCobrada - enCalle - gastos - retiros - deudaSocios,
   };
 }
 
@@ -434,6 +437,30 @@ export function movsSocio(s) {
 }
 export const saldoSocio = (s) => sum(s.movs || [], (m) => (m.tipo === 'retiro' ? -m.valor : m.valor));
 
+// ---- Deudas de los socios con el negocio (préstamos sin interés) ----
+// socio.deudas = [{ id, ts, fecha, tipo: 'prestamo' | 'abono', valor, origen?: 'caja' | 'aporte' | 'ganancia', nota, enlace? }]
+//   prestamo          → sale dinero de la caja y sube su deuda.
+//   abono 'caja'      → paga en efectivo: entra a la caja y baja su deuda.
+//   abono 'aporte'    → se descuenta de su capital: crea un retiro en socio.movs (enlace = id de ese retiro).
+//                       La caja no cambia: el dinero ya había salido cuando se le prestó.
+//   abono 'ganancia'  → se descuenta de su parte de la ganancia: crea un retiro de ganancia en state.gastos
+//                       con su socioId (enlace = id de ese gasto). La caja no cambia y en el reparto le toca menos.
+export const ORIGEN_ABONO = {
+  caja: 'Pagó en efectivo (entra a la caja)',
+  aporte: 'Descontado de su aporte (capital)',
+  ganancia: 'Descontado de su ganancia',
+};
+export const saldoDeudaSocio = (s) => sum(s.deudas || [], (d) => (d.tipo === 'prestamo' ? d.valor : -d.valor));
+export function movsDeudaSocio(s) {
+  let saldo = 0;
+  return [...(s.deudas || [])].sort(ordenMovs).map((d) => {
+    saldo += d.tipo === 'prestamo' ? d.valor : -d.valor;
+    return { ...d, saldo };
+  });
+}
+/** Efecto de un movimiento de deuda de socio en la caja (+ entra, − sale). */
+export const efectoCajaDeuda = (d) => (d.tipo === 'prestamo' ? -d.valor : d.origen === 'caja' ? d.valor : 0);
+
 // ---- Informe mensual para socios ----
 /**
  * Resumen de un mes ('AAAA-MM'): lo que pasó en el mes y cómo quedó todo al cierre
@@ -474,7 +501,7 @@ export function informeMes(state, mes, hoy = today()) {
   const snap = {
     ...state,
     prestamos: state.prestamos.filter((p) => p.fecha <= corte).map((p) => ({ ...p, movs: (p.movs || []).filter((m) => m.fecha <= corte) })),
-    socios: state.socios.map((s) => ({ ...s, movs: (s.movs || []).filter((m) => m.fecha <= corte) })),
+    socios: state.socios.map((s) => ({ ...s, movs: (s.movs || []).filter((m) => m.fecha <= corte), deudas: (s.deudas || []).filter((d) => d.fecha <= corte) })),
     gastos: (state.gastos || []).filter((g) => g.fecha <= corte),
   };
   const r = resumenGeneral(snap, corte);
@@ -491,8 +518,12 @@ export function informeMes(state, mes, hoy = today()) {
     const parteGanancia = Math.round(aRepartir * pct);
     const descuento = Math.round(Number(desc?.valor) || 0);
     const retirosGanancia = sum(retirosMes.filter((g) => g.socioId === s.id), (g) => g.valor);
+    const deudasMes = (s.deudas || []).filter((d) => enMes(d.fecha));
     return {
       socio: original.get(s.id) || s, base, pct, participa: pct > 0,
+      deuda: saldoDeudaSocio(s),
+      prestadoSocio: sum(deudasMes.filter((d) => d.tipo === 'prestamo'), (d) => d.valor),
+      abonadoSocio: sum(deudasMes.filter((d) => d.tipo === 'abono'), (d) => d.valor),
       aportes: sum(delMes.filter((m) => m.tipo !== 'retiro'), (m) => m.valor),
       retiros: sum(delMes.filter((m) => m.tipo === 'retiro'), (m) => m.valor),
       parteGanancia, descuento, notaDescuento: desc?.nota || '', retirosGanancia,
@@ -500,6 +531,11 @@ export function informeMes(state, mes, hoy = today()) {
     };
   });
   const sumaPct = Math.round(sum(socios, (x) => x.pct) * 1000) / 10;
+  // Préstamos a socios del mes: sale de caja; abonos en efectivo entran. Los de ganancia ya están como retiro
+  // (que resta) y a la vez entran como abono (suma): en caja quedan en cero.
+  const deudasSociosMes = state.socios.flatMap((s) => (s.deudas || []).filter((d) => enMes(d.fecha)));
+  const prestadoSocios = sum(deudasSociosMes.filter((d) => d.tipo === 'prestamo'), (d) => d.valor);
+  const abonosSociosCaja = sum(deudasSociosMes.filter((d) => d.tipo === 'abono' && (d.origen === 'caja' || d.origen === 'ganancia')), (d) => d.valor);
 
   // Cartera en riesgo al corte: atrasados y con plazo vencido (lo que se repartió como pactado y aún no entra).
   const atr = r.activos.filter((c) => c.estado === 'atrasado');
@@ -519,7 +555,8 @@ export function informeMes(state, mes, hoy = today()) {
     pactada, intereses: pactada - adicionales, adicionales, nAdicionales,
     gananciaCobrada, gastos: gm.gastos, retiros: gm.retiros, gananciaNeta, aRepartir,
     // Efectivo que entró (+) o salió (−) en el mes: cobrado − prestado − gastos − retiros de ganancia.
-    flujo: cobrado - sum(nuevos, (p) => p.capital) - gm.gastos - gm.retiros,
+    flujo: cobrado - sum(nuevos, (p) => p.capital) - gm.gastos - gm.retiros - prestadoSocios + abonosSociosCaja,
+    prestadoSocios, abonosSociosCaja,
     riesgo,
     terminados: terminados.length,
     r, socios, sumaPct, repartoConfigurado: socios.some((x) => x.participa), retirosSinSocio,

@@ -139,7 +139,8 @@ export function render(app, _p, query) {
         <dt>Capital base</dt><dd>${money(r.capitalBase)}</dd>
         <dt>Dinero en la calle</dt><dd>${money(r.enCalle)}</dd>
         <dt><b>Total deuda por cobrar</b></dt><dd><b>${money(r.porCobrar)}</b></dd>
-        <dt>Disponible</dt><dd>${money(r.disponible)}</dd>
+        ${r.deudaSocios ? `<dt>Le deben los socios (sin interés)</dt><dd>${money(r.deudaSocios)}</dd>` : ''}
+        <dt>Disponible (caja)</dt><dd>${money(r.disponible)}</dd>
         <dt>Ganancia + adicionales (acumulada)</dt><dd>${money(r.gananciaTotal)}</dd>
         <dt>Ganancia + capital</dt><dd>${money(r.gananciaMasCapital)}</dd>
       </dl>

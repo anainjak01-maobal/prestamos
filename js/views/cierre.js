@@ -27,7 +27,12 @@ export function render(app, _p, query) {
   const prestado = nuevos.reduce((a, p) => a + p.capital, 0);
   const totGastos = gastos.filter((g) => g.tipo !== 'retiro').reduce((a, g) => a + g.valor, 0);
   const totRetiros = gastos.filter((g) => g.tipo === 'retiro').reduce((a, g) => a + g.valor, 0);
-  const efectivo = cobrado - prestado - totGastos - totRetiros;
+  // Préstamos a socios (salen de caja) y sus abonos. Los abonos "de su ganancia" ya están como retiro del día
+  // (que resta) y entran como abono (suma): en caja quedan en cero. Los "de su aporte" no mueven caja.
+  const deudasSocios = s.socios.flatMap((so) => (so.deudas || []).filter((d) => d.fecha === fecha).map((d) => ({ so, d })));
+  const prestadoSocios = deudasSocios.filter((x) => x.d.tipo === 'prestamo').reduce((a, x) => a + x.d.valor, 0);
+  const abonosSocios = deudasSocios.filter((x) => x.d.tipo === 'abono' && x.d.origen !== 'aporte').reduce((a, x) => a + x.d.valor, 0);
+  const efectivo = cobrado - prestado - totGastos - totRetiros - prestadoSocios + abonosSocios;
 
   // Quién no pagó (solo tiene sentido para hoy)
   let noPagaron = [];
@@ -78,6 +83,11 @@ export function render(app, _p, query) {
     ${nuevos.length ? `<div class="section-title">Préstamos entregados <span class="muted">${nuevos.length}</span></div>
       <div class="list">${nuevos.map((p) => item(`#/prestamo/${p.id}`, nombre(p), `#${p.id} · ${esc(p.modalidad)} · ${p.tasa}%`, money(p.capital))).join('')}</div>` : ''}
 
+    ${deudasSocios.length ? `<div class="section-title">Socios <span class="muted">${deudasSocios.length}</span></div>
+      <div class="list">${deudasSocios.map(({ so, d }) => item(`#/socio/${so.id}`, so.nombre,
+        d.tipo === 'prestamo' ? `Préstamo sin interés${d.nota ? ' · ' + esc(d.nota) : ''}` : `Abono a su deuda · ${d.origen === 'caja' ? 'en efectivo' : d.origen === 'aporte' ? 'de su aporte (no mueve caja)' : 'de su ganancia'}`,
+        (d.tipo === 'prestamo' ? '− ' : '+ ') + money(d.valor), d.tipo === 'prestamo' ? 'var(--warn)' : 'var(--ok)')).join('')}</div>` : ''}
+
     ${gastos.length ? `<div class="section-title">Gastos y retiros <span class="muted">${gastos.length}</span></div>
       <div class="list">${gastos.map((g) => item('#/gastos', g.tipo === 'retiro' ? 'Retiro de ganancia' : g.categoria || 'Gasto', esc(g.nota || ''), '− ' + money(g.valor), g.tipo === 'retiro' ? 'var(--violet)' : 'var(--danger)')).join('')}</div>` : ''}`;
 
@@ -93,6 +103,8 @@ export function render(app, _p, query) {
     t.push(`Prestado: ${money(prestado)} (${nuevos.length})`);
     if (totGastos) t.push(`Gastos: ${money(totGastos)}`);
     if (totRetiros) t.push(`Retiros: ${money(totRetiros)}`);
+    if (prestadoSocios) t.push(`Préstamos a socios: ${money(prestadoSocios)}`);
+    if (abonosSocios) t.push(`Abonos de socios: ${money(abonosSocios)}`);
     t.push(`*Efectivo del día: ${money(efectivo)}*`);
     if (pagos.length) {
       t.push('', 'Pagos:');
