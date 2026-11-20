@@ -551,6 +551,16 @@ export function movsDeudaSocio(s) {
 /** Efecto de un movimiento de deuda de socio en la caja (+ entra, − sale). */
 export const efectoCajaDeuda = (d) => (d.tipo === 'prestamo' ? -d.valor : d.origen === 'caja' ? d.valor : 0);
 
+/** Copia del estado con lo registrado hasta una fecha (incluida). Sirve para saber cómo estaba la caja ese día. */
+export function estadoAl(state, corte) {
+  return {
+    ...state,
+    prestamos: state.prestamos.filter((p) => p.fecha <= corte).map((p) => ({ ...p, movs: (p.movs || []).filter((m) => m.fecha <= corte) })),
+    socios: state.socios.map((s) => ({ ...s, movs: (s.movs || []).filter((m) => m.fecha <= corte), deudas: (s.deudas || []).filter((d) => d.fecha <= corte) })),
+    gastos: (state.gastos || []).filter((g) => g.fecha <= corte),
+  };
+}
+
 // ---- Informe mensual para socios ----
 /**
  * Resumen de un mes ('AAAA-MM'): lo que pasó en el mes y cómo quedó todo al cierre
@@ -588,12 +598,7 @@ export function informeMes(state, mes, hoy = today()) {
   const aRepartir = pactada - gm.gastos;
 
   // Estado al corte: los mismos cálculos de siempre, con lo registrado hasta esa fecha.
-  const snap = {
-    ...state,
-    prestamos: state.prestamos.filter((p) => p.fecha <= corte).map((p) => ({ ...p, movs: (p.movs || []).filter((m) => m.fecha <= corte) })),
-    socios: state.socios.map((s) => ({ ...s, movs: (s.movs || []).filter((m) => m.fecha <= corte), deudas: (s.deudas || []).filter((d) => d.fecha <= corte) })),
-    gastos: (state.gastos || []).filter((g) => g.fecha <= corte),
-  };
+  const snap = estadoAl(state, corte);
   const r = resumenGeneral(snap, corte);
 
   const original = new Map(state.socios.map((s) => [s.id, s]));
