@@ -109,6 +109,8 @@ export function calcular(p, hoy = today(), cfg = {}) {
     }
   }
 
+  if (p.cartonEliminado) colapsarCarton(lineas);
+
   const c = ciclos[ciclos.length - 1];
   const vc = Math.max(1, Math.round(c.valorCuota || c.total));
   const totalCiclo = c.total + c.extra;
@@ -230,7 +232,7 @@ export function resumenGeneral(state, hoy = today()) {
   const pagosHoy = [];
   for (const c of calcs) {
     for (const m of c.p.movs || []) {
-      if ((m.tipo === 'pago' || m.tipo === 'renovacion') && m.fecha === hoy) pagosHoy.push(m);
+      if ((m.tipo === 'pago' || m.tipo === 'renovacion') && m.fecha === hoy && !esResumenCarton(m)) pagosHoy.push(m);
     }
   }
   const capitalBase = sum(state.socios, (s) => saldoSocio(s));
@@ -447,14 +449,71 @@ export function eliminarCarton(p, c, hoy = today()) {
   if (extra > 0) movs.push({ id: id(), ts: 1, tipo: 'interes', resumen: true, adicionales, fecha: fechaPago, valor: extra, nota: 'Intereses adicionales y renovaciones (resumen)' });
   if (extra < 0) movs.push({ id: id(), ts: 1, tipo: 'ajuste', resumen: true, fecha: fechaPago, valor: extra, nota: 'Descuentos (resumen)' });
   // Las transferencias que aún no se sacan de la cuenta se conservan: siguen en la lista "por retirar".
-  const pendTr = (p.movs || []).filter((m) => (m.tipo === 'pago' || m.tipo === 'renovacion') && esTransferencia(m) && !m.retirado)
+  const esPago = (m) => m.tipo === 'pago' || m.tipo === 'renovacion';
+  const pendTr = (p.movs || []).filter((m) => esPago(m) && esTransferencia(m) && !m.retirado)
     .map((m) => ({ id: m.id, ts: 3, tipo: 'pago', fecha: m.fecha, valor: m.valor, medio: 'transferencia', ...(m.cuenta ? { cuenta: m.cuenta } : {}), nota: 'Transferencia (por retirar)' }));
+  // Los demás pagos quedan como UN pago por día (y por medio), marcados carton: true. En el préstamo se ven
+  // como una sola línea "Pagó todo", pero el cierre del día y los informes siguen sumando lo de cada fecha.
+  const grupos = new Map();
+  for (const m of (p.movs || []).filter((x) => esPago(x) && !(esTransferencia(x) && !x.retirado))) {
+    const tr = esTransferencia(m);
+    const k = [m.fecha, tr ? 't' : 'e', tr ? m.cuenta || '' : '', tr ? m.retirado || '' : ''].join('|');
+    const g = grupos.get(k) || { fecha: m.fecha, valor: 0, n: 0, tr, cuenta: m.cuenta, retirado: m.retirado };
+    g.valor += Math.round(m.valor || 0); g.n++;
+    grupos.set(k, g);
+  }
+  const porDia = [...grupos.values()].sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0))
+    .map((g) => ({ id: id(), ts: 2, tipo: 'pago', carton: true, fecha: g.fecha, valor: g.valor, nota: g.n > 1 ? `${g.n} pagos` : '',
+      ...(g.tr ? { medio: 'transferencia', ...(g.cuenta ? { cuenta: g.cuenta } : {}), ...(g.retirado ? { retirado: g.retirado } : {}) } : {}) }));
   const resto = c.pagado - sum(pendTr, (m) => m.valor);
-  if (resto > 0) movs.push({ id: id(), ts: 2, tipo: 'pago', fecha: fechaPago, valor: resto, nota: 'Pagó todo (cartón eliminado)' });
+  if (sum(porDia, (m) => m.valor) === resto) movs.push(...porDia.filter((m) => m.valor > 0));
+  else if (resto > 0) movs.push({ id: id(), ts: 2, tipo: 'pago', fecha: fechaPago, valor: resto, nota: 'Pagó todo (cartón eliminado)' });
   movs.push(...pendTr);
   p.movs = movs;
   p.cartonEliminado = { fecha: hoy, movimientos: n };
   return p;
+}
+
+/**
+ * Pago-resumen de un cartón eliminado ANTES de la v1.19.1: un solo pago con el total del préstamo en la fecha
+ * del último pago. No es lo que se cobró ese día, así que el cierre del día no lo suma. También son resumen
+ * los "Pagos anteriores" que quedan al separar el pago del día (separarPagoDelDia).
+ */
+export const esResumenCarton = (m) => m?.tipo === 'pago' && (m.resumen === true || (!m.carton && m.nota === 'Pagó todo (cartón eliminado)'));
+
+/** Corrige un resumen viejo: valorDia es lo que el cliente pagó ese día; el resto queda como "Pagos anteriores". */
+export function separarPagoDelDia(p, m, valorDia) {
+  const v = Math.round(valorDia || 0);
+  if (!(v > 0) || !esResumenCarton(m) || m.resumen) return false;
+  if (v < m.valor) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    p.movs.push({ id, ts: (m.ts || 2) - 0.5, tipo: 'pago', carton: true, resumen: true, fecha: m.fecha, valor: m.valor - v, nota: 'Pagos anteriores (resumen)' });
+  }
+  m.valor = Math.min(v, m.valor);
+  m.carton = true;
+  m.nota = 'Pago del día';
+  return true;
+}
+
+/** En un cartón eliminado, junta las líneas de pago (carton: true) en una sola para mostrarla. */
+function colapsarCarton(lineas) {
+  const cl = lineas.filter((l) => l.tipo === 'pago' && l.mov?.carton);
+  if (cl.length < 2) return;
+  const ult = cl[cl.length - 1];
+  const dias = new Set(cl.map((l) => l.fecha)).size;
+  const fila = { fecha: ult.fecha, tipo: 'pago', abono: sum(cl, (l) => l.abono), saldo: 0, carton: true, pagos: cl.map((l) => l.mov),
+    nota: `Pagó todo (cartón eliminado) · ${dias} día${dias === 1 ? '' : 's'} de pago` };
+  const resto = lineas.filter((l) => !cl.includes(l));
+  const i = resto.findIndex((l) => l.fecha > ult.fecha);
+  resto.splice(i < 0 ? resto.length : i, 0, fila);
+  // Resta recalculada en el orden que se muestra
+  let saldo = 0;
+  for (const l of resto) {
+    if (l.tipo === 'renovacion') { saldo = l.saldo; continue; }
+    saldo += (l.cargo || 0) - (l.abono || 0);
+    l.saldo = saldo;
+  }
+  lineas.splice(0, lineas.length, ...resto);
 }
 
 // ---- Capital de socios ----

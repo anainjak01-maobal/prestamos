@@ -353,6 +353,7 @@ export function detalle(app, id) {
     const tr = e.target.closest('[data-mov]');
     if (!tr) return;
     if (tr.dataset.mov === 'prestamo') return abrirEditar(app, p);
+    if (tr.dataset.mov === 'carton') return verPagosCarton(c);
     const m = p.movs.find((x) => x.id === tr.dataset.mov);
     if (m) abrirMovimiento(app, p, m);
   });
@@ -429,9 +430,23 @@ async function confirmarEliminarCarton(app, p, c) {
   refreshLuego(app);
 }
 
+/** Pagos por día de un cartón eliminado (solo lectura). */
+function verPagosCarton(c) {
+  const fila = c.lineas.find((l) => l.carton);
+  if (!fila) return;
+  sheet({
+    title: 'Pagos del cartón',
+    ico: 'cash',
+    tone: 'tone-ok',
+    body: `<p class="small muted" style="margin-top:-6px">El detalle se borró, pero se guarda el total de cada día para que el cierre del día y los informes cuadren.</p>
+      <div class="summary">${fila.pagos.map((m) => `<div class="r"><span>${fdate(m.fecha)}${m.nota ? ` <span class="muted">· ${esc(m.nota)}</span>` : ''}${m.medio === 'transferencia' ? ' <span class="tr-tag">transferencia</span>' : ''}</span><b>${money(m.valor)}</b></div>`).join('')}
+      <div class="r total"><span>Total</span><b>${money(fila.abono)}</b></div></div>`,
+  });
+}
+
 function movsHtml(c) {
   const rows = c.lineas.map((l) => {
-    const id = l.mov ? l.mov.id : 'prestamo';
+    const id = l.carton ? 'carton' : l.mov ? l.mov.id : 'prestamo';
     const etiqueta = {
       prestamo: 'Préstamo', pago: 'Abono', interes: 'Interés adicional', interes_omitido: 'Interés no aplicado', ajuste: 'Ajuste', renovacion: 'Nuevo ciclo',
     }[l.tipo];

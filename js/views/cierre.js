@@ -1,9 +1,9 @@
 // Cierre del día: lo cobrado, lo prestado, los gastos y quién no pagó.
 import { icon } from '../icons.js';
-import { $, esc, money, today, addDays, ffull, fdate, avatarTone, initials } from '../utils.js';
-import { calcular, esTransferencia, transferencias } from '../logic.js';
+import { $, esc, money, today, addDays, ffull, fdate, avatarTone, initials, parseMoney } from '../utils.js';
+import { calcular, esTransferencia, transferencias, esResumenCarton, separarPagoDelDia } from '../logic.js';
 import { getCliente } from '../store.js';
-import { toast, emptyState } from '../ui.js';
+import { toast, emptyState, sheet, moneyField } from '../ui.js';
 
 export function render(app, _p, query) {
   const s = app.state;
@@ -14,12 +14,15 @@ export function render(app, _p, query) {
 
   const nombre = (p) => getCliente(p.clienteId)?.nombre || 'Cliente';
   const pagos = [];
+  // Resúmenes de cartones eliminados con la versión vieja: llevan el total del préstamo, no lo de este día.
+  const resumenes = [];
   for (const p of s.prestamos) {
     if (p.estado === 'anulado') continue;
     for (const m of p.movs || []) {
-      if ((m.tipo === 'pago' || m.tipo === 'renovacion') && m.fecha === fecha) pagos.push({ p, m });
+      if ((m.tipo === 'pago' || m.tipo === 'renovacion') && m.fecha === fecha) (esResumenCarton(m) ? resumenes : pagos).push({ p, m });
     }
   }
+  const viejos = resumenes.filter(({ m }) => !m.resumen); // los que aún se pueden corregir
   pagos.sort((a, b) => (a.m.ts || 0) - (b.m.ts || 0));
   const nuevos = s.prestamos.filter((p) => p.estado !== 'anulado' && p.fecha === fecha);
   const gastos = (s.gastos || []).filter((g) => g.fecha === fecha);
@@ -89,6 +92,13 @@ export function render(app, _p, query) {
       </div>`
       : emptyState('cash', 'Sin pagos este día')}
 
+    ${viejos.length ? `<div class="section-title">Cartones eliminados · por corregir <span class="muted">${viejos.length}</span></div>
+      <div class="alert warn">${icon('alert')}<div class="grow small">Estos valores son el <b>total del préstamo</b>, no lo que pagó este día, por eso <b>no se suman</b> arriba. Toca cada uno y escribe cuánto pagó el cliente este día.</div></div>
+      <div class="list" data-viejos>${viejos.map(({ p, m }) => `<div class="item" data-viejo="${p.id}|${m.id}" style="cursor:pointer">
+        <div class="avatar ${avatarTone(nombre(p))}">${esc(initials(nombre(p)))}</div>
+        <div class="grow"><div class="t ellipsis">${esc(nombre(p))}</div><div class="s ellipsis">#${p.id} · total del préstamo · toca para corregir</div></div>
+        <div class="end"><span class="amt num muted">${money(m.valor)}</span></div></div>`).join('')}</div>` : ''}
+
     ${esHoy ? `<div class="section-title">No pagaron hoy <span class="muted">${noPagaron.length}</span></div>
       ${noPagaron.length ? `<div class="list">${noPagaron.map((c) => item(`#/prestamo/${c.p.id}`, nombre(c.p), `#${c.p.id} · ${c.diasMora > 0 ? `${c.diasMora} días de mora` : 'cuota de hoy'}`, money(c.aCobrarHoy), 'var(--danger)')).join('')}</div>`
         : emptyState('checkCircle', '¡Todos pagaron!')}` : ''}
@@ -106,6 +116,13 @@ export function render(app, _p, query) {
 
   $('[data-fecha]', main).addEventListener('change', (e) => e.target.value && app.go(`#/cierre?fecha=${e.target.value}`));
   main.addEventListener('click', (e) => {
+    const vj = e.target.closest('[data-viejo]');
+    if (vj) {
+      const [pid, mid] = vj.dataset.viejo.split('|');
+      const x = viejos.find(({ p, m }) => String(p.id) === pid && m.id === mid);
+      if (x) corregirResumen(app, x.p, x.m, nombre(x.p));
+      return;
+    }
     const it = e.target.closest('[data-href]');
     if (it) app.go(it.dataset.href);
   });
@@ -135,4 +152,34 @@ export function render(app, _p, query) {
       else { await navigator.clipboard.writeText(texto); toast('Cierre copiado'); }
     } catch { /* cancelado */ }
   };
+}
+
+/** Separa el pago-resumen de un cartón eliminado (versión vieja): lo que pagó ese día y los pagos anteriores. */
+function corregirResumen(app, p, m, nombreCliente) {
+  sheet({
+    title: 'Pago del día',
+    ico: 'cash',
+    tone: 'tone-ok',
+    body: `<div class="summary">
+        <div class="r"><span>Cliente</span><b>${esc(nombreCliente)} · #${p.id}</b></div>
+        <div class="r"><span>Fecha</span><b>${fdate(m.fecha)}</b></div>
+        <div class="r"><span>Total del préstamo (resumen)</span><b>${money(m.valor)}</b></div></div>
+      ${moneyField('valor', '¿Cuánto pagó el cliente este día?', '')}
+      <p class="small muted">El resto (lo que pagó antes) queda guardado como “Pagos anteriores” y no se suma en el cierre de este día. El total pagado y la ganancia del préstamo no cambian.</p>
+      <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar</button>`,
+    onMount(el, api) {
+      const inp = $('[name=valor]', el);
+      setTimeout(() => inp.focus(), 280);
+      $('[data-ok]', el).onclick = async () => {
+        const v = parseMoney(inp.value);
+        if (!(v > 0)) return toast('Escribe cuánto pagó ese día', 'err');
+        if (v > m.valor) return toast(`No puede ser más que ${money(m.valor)}`, 'err');
+        separarPagoDelDia(p, m, v);
+        await app.save();
+        api.close();
+        toast(`Listo: ${money(v)} el ${fdate(m.fecha)}`);
+        app.refresh();
+      };
+    },
+  });
 }

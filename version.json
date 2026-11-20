@@ -1,9 +1,9 @@
 {
-  "version": "1.19.0",
+  "version": "1.19.1",
   "fecha": "2026-11-20",
   "novedades": [
-    "Nuevo préstamo: al tocar Cliente se abre la lista con un cuadro de búsqueda. Escribe el nombre, la cédula o el teléfono y lo encuentras al instante.",
-    "Si el cliente no existe, desde ahí mismo lo creas con el nombre que escribiste.",
-    "El mismo buscador está en Editar préstamo y en los adicionales."
+    "Corregido: el cierre del día sumaba el total de un préstamo cuando se eliminaba su cartón, en vez de lo que el cliente pagó ese día.",
+    "Desde ahora, al eliminar un cartón la app guarda lo que se pagó cada día (en el préstamo sigues viendo una sola línea “Pagó todo”).",
+    "Los cartones que ya habías eliminado salen aparte en el cierre del día, como “por corregir”: tócalos y escribe cuánto pagó el cliente ese día."
   ]
 }
