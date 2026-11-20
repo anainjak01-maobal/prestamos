@@ -420,3 +420,10 @@ input[type="month"], input[type="date"] { min-width: 0; max-width: 100%; }
 .item.sel { background: var(--info-soft); }
 .tr-check { width: 22px; height: 22px; accent-color: var(--info); flex: none; }
 a.kpi { color: inherit; text-decoration: none; }
+
+/* Selector de cliente con buscador */
+.input.picker { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer; color: var(--text); font: inherit; min-height: 46px; }
+.input.picker > svg { color: var(--text-3); flex: none; }
+.avatar.xs { width: 28px; height: 28px; border-radius: 9px; font-size: 11.5px; }
+.pick-search { position: sticky; top: -8px; z-index: 2; box-shadow: 0 0 0 6px var(--bg), var(--shadow); }
+.sheet.sheet-alta { height: 85vh; }

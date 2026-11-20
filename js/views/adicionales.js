@@ -5,6 +5,7 @@ import { resumenGeneral } from '../logic.js';
 import { sheet, toast, field, moneyField, segHtml, segValue, confirmDialog, emptyState } from '../ui.js';
 import { pickAdicionalesFile } from '../backup.js';
 import * as store from '../store.js';
+import { selectorClienteHtml, bindSelectorCliente } from './clientes.js';
 
 /** Adicionales aplicados en los préstamos de la app (no anulados), del más reciente al más viejo. */
 export function adicionalesApp(calcs) {
@@ -117,21 +118,20 @@ async function compartir(r, deApp, totApp, hist, manual, totHist) {
 function abrirLinea(app, a) {
   const s = app.state;
   const v = a || { nombre: '', clienteId: null, valor: 0, nota: 'Pagó' };
-  const opciones = [...s.clientes].sort((x, y) => x.nombre.localeCompare(y.nombre))
-    .map((c) => `<option value="${c.id}" ${c.id === v.clienteId ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('');
   sheet({
     title: a ? 'Adicional histórico' : 'Nuevo adicional histórico',
     ico: 'percent',
     tone: 'tone-violet',
     body: `${a?.fila ? `<p class="small muted" style="margin-top:-6px">Importado del Excel (hoja GANANCIAS, fila ${a.fila}).</p>` : ''}
       ${field('Nombre (como estaba en el Excel)', `<input name="nombre" value="${esc(v.nombre)}">`)}
-      ${field('Cliente de la app', `<select name="cliente"><option value="">— Sin cliente —</option>${opciones}</select>`, 'Si lo eliges, aparece también en la ficha del cliente.')}
+      <div class="field"><label>Cliente de la app</label>${selectorClienteHtml('cliente', v.clienteId, { vacio: '— Sin cliente —' })}<div class="hint">Si lo eliges, aparece también en la ficha del cliente.</div></div>
       <div class="field"><span class="lbl">Tipo</span>${segHtml('signo', ['Suma', 'Resta (cuadre)'], v.valor < 0 ? 'Resta (cuadre)' : 'Suma')}</div>
       ${moneyField('valor', 'Valor', Math.abs(v.valor) || '')}
       ${field('Nota', `<input name="nota" value="${esc(v.nota || '')}">`)}
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar</button>
       ${a ? `<div style="height:10px"></div><button class="btn danger block" data-del>${icon('trash', 'sm')} Eliminar línea</button>` : ''}`,
     onMount(el, api) {
+      bindSelectorCliente(el, 'cliente', { permitirVacio: true });
       $('[data-ok]', el).onclick = async () => {
         const val = parseMoney($('[name=valor]', el).value);
         const nombre = $('[name=nombre]', el).value.trim();

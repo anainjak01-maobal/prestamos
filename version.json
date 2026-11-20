@@ -1,8 +1,9 @@
 {
-  "version": "1.18.2",
+  "version": "1.19.0",
   "fecha": "2026-11-20",
   "novedades": [
-    "Si pasas a otra app (por ejemplo WhatsApp) y vuelves, la app ya no te pide la contraseña, aunque el teléfono la haya cerrado por detrás.",
-    "Solo la pide si se cumple el tiempo de bloqueo (Más → Ajustes) o si tocas el candado. Ese tiempo cuenta desde que sales de la app."
+    "Nuevo préstamo: al tocar Cliente se abre la lista con un cuadro de búsqueda. Escribe el nombre, la cédula o el teléfono y lo encuentras al instante.",
+    "Si el cliente no existe, desde ahí mismo lo creas con el nombre que escribiste.",
+    "El mismo buscador está en Editar préstamo y en los adicionales."
   ]
 }

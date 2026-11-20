@@ -8,6 +8,79 @@ import { itemPrestamo, bindLista, estadoBadge } from './prestamos.js';
 
 let busqueda = '';
 
+// ---------------------------------------------------------------------
+// Selector de cliente con buscador. Reemplaza al <select>: un botón que abre una hoja con un cuadro de
+// búsqueda (nombre, cédula, teléfono, código) y la lista filtrada. El valor queda en un input oculto
+// con el mismo name, así que form.cliente.value sigue funcionando y se dispara 'change' al elegir.
+// ---------------------------------------------------------------------
+const etiquetaCliente = (c, vacio) => (c
+  ? `<span class="avatar xs ${avatarTone(c.nombre)}">${esc(initials(c.nombre))}</span><span class="grow ellipsis">${esc(c.nombre)}${c.codigo ? ` <span class="muted">(${esc(c.codigo)})</span>` : ''}</span>`
+  : `<span class="grow muted">${esc(vacio)}</span>`);
+
+export function selectorClienteHtml(name, selId, { vacio = '— Elige el cliente —' } = {}) {
+  const c = selId ? store.getCliente(selId) : null;
+  return `<input type="hidden" name="${name}" value="${esc(c ? c.id : '')}">
+    <button type="button" class="input picker" data-picker="${name}" data-vacio="${esc(vacio)}">${etiquetaCliente(c, vacio)}${icon('search', 'sm')}</button>`;
+}
+
+/** Activa el selector. onNuevo (opcional): botón "Nuevo cliente" dentro de la hoja; recibe el texto buscado. */
+export function bindSelectorCliente(root, name, { permitirVacio = false, onNuevo } = {}) {
+  const input = root.querySelector(`input[type=hidden][name="${name}"]`);
+  const btn = root.querySelector(`[data-picker="${name}"]`);
+  if (!input || !btn) return null;
+  const set = (id) => {
+    const c = id ? store.getCliente(id) : null;
+    input.value = c ? c.id : '';
+    btn.innerHTML = etiquetaCliente(c, btn.dataset.vacio) + icon('search', 'sm');
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  btn.onclick = () => abrirBuscadorCliente({ actual: input.value, permitirVacio, onNuevo, onPick: set });
+  return { set };
+}
+
+function abrirBuscadorCliente({ actual, permitirVacio, onNuevo, onPick }) {
+  const todos = [...store.state.clientes].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  sheet({
+    title: 'Elige el cliente',
+    ico: 'users',
+    tone: 'tone-info',
+    body: `<div class="search pick-search">${icon('search', 'sm')}<input type="search" placeholder="Buscar por nombre, cédula o teléfono" autocomplete="off" data-q></div>
+      <p class="small muted" data-n style="margin:0 4px 8px"></p>
+      <div data-res></div>`,
+    onMount(el, api) {
+      el.classList.add('sheet-alta'); // altura fija: no salta mientras se escribe
+      const q = $('[data-q]', el);
+      const res = $('[data-res]', el);
+      const draw = () => {
+        const t = norm(q.value.trim());
+        const lista = t ? todos.filter((c) => [c.nombre, c.cedula, c.telefono, c.codigo, c.direccion, c.barrio].some((x) => norm(x).includes(t))) : todos;
+        $('[data-n]', el).textContent = t ? `${lista.length} de ${todos.length} clientes` : `${todos.length} clientes`;
+        const nuevo = onNuevo ? `<button type="button" class="btn block" data-nuevo style="margin-top:10px">${icon('userPlus', 'sm')} Nuevo cliente${q.value.trim() ? `: ${esc(q.value.trim())}` : ''}</button>` : '';
+        res.innerHTML = (permitirVacio && !t ? `<div class="list" style="margin-bottom:8px"><div class="item" data-id=""><div class="grow muted">— Sin cliente —</div></div></div>` : '')
+          + (lista.length
+            ? `<div class="list">${lista.slice(0, 200).map((c) => `<div class="item ${c.id === actual ? 'sel' : ''}" data-id="${c.id}">
+                <div class="avatar ${avatarTone(c.nombre)}">${esc(initials(c.nombre))}</div>
+                <div class="grow"><div class="t ellipsis">${esc(c.nombre)}</div><div class="s ellipsis">${esc([c.codigo, c.cedula ? 'CC ' + c.cedula : '', c.telefono].filter(Boolean).join(' · ') || 'Sin datos')}</div></div>
+                ${c.id === actual ? `<div class="end" style="color:var(--primary)">${icon('check', 'sm')}</div>` : ''}</div>`).join('')}</div>
+              ${lista.length > 200 ? '<p class="small muted" style="margin:8px 4px">Hay más resultados: escribe más letras para encontrarlo.</p>' : ''}`
+            : emptyState('search', 'Sin resultados', 'Prueba con otro nombre, la cédula o el teléfono.'))
+          + nuevo;
+      };
+      q.addEventListener('input', draw);
+      res.addEventListener('click', (e) => {
+        // Abrir otra hoja solo cuando esta termine de cerrarse (si no, el "atrás" interno se confunde).
+        if (e.target.closest('[data-nuevo]')) { const texto = q.value.trim(); api.close(); afterLayers(() => onNuevo(texto)); return; }
+        const it = e.target.closest('[data-id]');
+        if (!it) return;
+        api.close();
+        onPick(it.dataset.id);
+      });
+      draw();
+      setTimeout(() => q.focus(), 280);
+    },
+  });
+}
+
 const PRIORIDAD = { vencido: 5, atrasado: 4, hoy: 3, al_dia: 2, pagado: 1, anulado: 0 };
 
 function resumenCliente(cl, calcs, cfg = {}) {
@@ -125,8 +198,8 @@ export function detalle(app, id) {
 }
 
 /** Formulario de cliente (nuevo o editar). onSaved(cliente) se llama después de guardar. */
-export function abrirFormCliente(app, cl, onSaved, { stay = false } = {}) {
-  const v = cl || {};
+export function abrirFormCliente(app, cl, onSaved, { stay = false, nombre = '' } = {}) {
+  const v = cl || { nombre };
   sheet({
     title: cl ? 'Editar cliente' : 'Nuevo cliente',
     ico: cl ? 'edit' : 'userPlus',

@@ -6,7 +6,7 @@ import { sheet, confirmDialog, toast, field, moneyField, segHtml, segValue, swit
 import { getCliente, getPrestamo, addMov, addPrestamo } from '../store.js';
 import * as store from '../store.js';
 import { estadoBadge } from './prestamos.js';
-import { abrirFormCliente, calificacionDe, calBadge } from './clientes.js';
+import { abrirFormCliente, calificacionDe, calBadge, selectorClienteHtml, bindSelectorCliente } from './clientes.js';
 import { drawCard, shareCardImage, textoEstadoCuenta, textoRecordatorio, openWhatsApp } from '../card.js';
 
 const cfg = () => store.state.config;
@@ -196,12 +196,10 @@ function bindInteresRedondeable(el, { capital, fijoInicial = null, onChange }) {
 export function nuevo(app, _p, query) {
   const c = cfg();
   const main = app.shell({ title: 'Nuevo préstamo', back: query.cliente ? `#/cliente/${query.cliente}` : '#/prestamos', tab: 'prestamos' });
-  const clientes = [...store.state.clientes].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   const v = { fecha: today(), capital: '', modalidad: 'Diario', tasa: c.tasa, nCuotas: CUOTAS_DEFECTO.Diario, valorCuota: '', cobraDomingos: c.cobraDomingos };
-  const opts = (sel) => `<option value="">— Elige el cliente —</option>${clientes.map((x) => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(x.nombre)}${x.codigo ? ` (${esc(x.codigo)})` : ''}</option>`).join('')}`;
   main.innerHTML = `<form class="card" autocomplete="off">
       <div class="field"><label>Cliente</label>
-        <div class="row"><select name="cliente" class="input grow">${opts(query.cliente)}</select>
+        <div class="row"><div class="grow" style="min-width:0">${selectorClienteHtml('cliente', query.cliente)}</div>
         <button type="button" class="btn sm" data-nuevo-cliente>${icon('userPlus', 'sm')} Nuevo</button></div>
         <div data-cal class="small"></div></div>
       ${condicionesHtml(v)}
@@ -235,12 +233,9 @@ export function nuevo(app, _p, query) {
   };
   form.cliente.addEventListener('change', mostrarCal);
   mostrarCal();
-  $('[data-nuevo-cliente]', main).onclick = () => abrirFormCliente(app, null, (cl) => {
-    clientes.push(cl);
-    clientes.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-    form.cliente.innerHTML = opts(cl.id);
-    mostrarCal();
-  }, { stay: true });
+  const crearCliente = (nombre = '') => abrirFormCliente(app, null, (cl) => selCli.set(cl.id), { stay: true, nombre });
+  const selCli = bindSelectorCliente(form, 'cliente', { onNuevo: crearCliente });
+  $('[data-nuevo-cliente]', main).onclick = () => crearCliente();
   $('[data-guardar]', main).onclick = async () => {
     const x = cond.read();
     const clienteId = form.cliente.value;
@@ -846,10 +841,11 @@ export function abrirEditar(app, p) {
         despuesFecha: ref ? field('El periodo cuenta desde', `<input type="date" name="inicio" value="${esc(v.inicio)}">`, 'De aquí salen las fechas de cobro de este ciclo.') : '' })}
       ${ref ? interesRedondeableHtml(ref.ciclo?.interesFijo ?? c.ciclo.interes) : interesRedondeableHtml(p.interesFijo ?? c.ciclos[0].interes, 'Interés del préstamo')}
       ${!ref ? field('Notas', `<textarea name="notas">${esc(p.notas || '')}</textarea>`) : ''}
-      ${!ref ? `<div class="field"><label>Cliente</label><select name="cliente" class="input">${[...store.state.clientes].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map((x) => `<option value="${x.id}" ${x.id === p.clienteId ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
+      ${!ref ? `<div class="field"><label>Cliente</label>${selectorClienteHtml('cliente', p.clienteId)}</div>` : ''}
       <div class="summary" data-res></div>
       <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar cambios</button>`,
     onMount(el, api) {
+      if (!ref) bindSelectorCliente(el, 'cliente');
       const res = $('[data-res]', el);
       const inicioEl = el.querySelector('[name=inicio]');
       let cond = null;
