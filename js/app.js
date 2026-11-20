@@ -114,11 +114,26 @@ function render() {
 window.addEventListener('hashchange', render);
 
 // ---- Bloqueo por inactividad ----
+// El tiempo cuenta desde el último toque o desde que sales a otra app. La sesión se guarda hasta esa hora,
+// así que si el teléfono cierra la app mientras estás en WhatsApp, al volver entras sin contraseña.
+const SESION_SIN_BLOQUEO = 12 * 3600000; // con "Nunca", la sesión guardada dura hasta 12 horas
 let ultimaActividad = Date.now();
-['pointerdown', 'keydown', 'touchstart'].forEach((ev) => addEventListener(ev, () => (ultimaActividad = Date.now()), { passive: true }));
+let sesionGuardada = 0;
+const minutosBloqueo = () => Number(store.state?.config?.bloqueoMin) || 0;
+const venceSesion = () => ultimaActividad + (minutosBloqueo() > 0 ? minutosBloqueo() * 60000 : SESION_SIN_BLOQUEO);
+function renovarSesion(forzar = false) {
+  if (!store.isUnlocked()) return;
+  if (!forzar && Date.now() - sesionGuardada < 30000) return;
+  sesionGuardada = Date.now();
+  store.guardarSesion(venceSesion());
+}
+['pointerdown', 'keydown', 'touchstart'].forEach((ev) => addEventListener(ev, () => {
+  ultimaActividad = Date.now();
+  renovarSesion();
+}, { passive: true }));
 function revisarBloqueo() {
   if (!store.isUnlocked()) return;
-  const min = Number(store.state.config.bloqueoMin) || 0;
+  const min = minutosBloqueo();
   if (min > 0 && Date.now() - ultimaActividad > min * 60000) bloquear();
 }
 setInterval(revisarBloqueo, 15000);
@@ -126,7 +141,14 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
     revisarBloqueo();
     buscarActualizacion();
+  } else if (store.isUnlocked()) {
+    // Sale a otra app: el tiempo de bloqueo empieza a contar desde ahora.
+    ultimaActividad = Date.now();
+    renovarSesion(true);
   }
+});
+addEventListener('pagehide', () => {
+  if (store.isUnlocked()) { ultimaActividad = Date.now(); renovarSesion(true); }
 });
 // Revisa si hay versión nueva cada 30 minutos mientras la app está abierta.
 setInterval(() => buscarActualizacion(), 30 * 60000);
@@ -140,6 +162,7 @@ export function bloquear() {
 
 function entrar() {
   ultimaActividad = Date.now();
+  renovarSesion(true);
   lastPath = null;
   render();
   mostrarNovedadesSiCorresponde();
@@ -153,7 +176,11 @@ async function boot() {
     root.innerHTML = '<div class="auth"><div class="box card"><h3>Conexión no segura</h3><p class="muted">Abre la app desde su dirección https (GitHub Pages) para poder usarla.</p></div></div>';
     return;
   }
-  if (await store.hasAccount()) auth.renderLogin(root, entrar);
+  if (await store.hasAccount()) {
+    // Si el teléfono cerró la app hace poco (por ejemplo, al pasar a WhatsApp), se entra sin contraseña.
+    if (await store.restaurarSesion()) entrar();
+    else auth.renderLogin(root, entrar);
+  }
   else auth.renderSetup(root, entrar);
   buscarActualizacion();
 }

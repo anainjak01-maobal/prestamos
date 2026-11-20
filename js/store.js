@@ -78,6 +78,40 @@ export async function login(usuario, clave) {
 export function lock() {
   key = null;
   state = null;
+  sesionExpira = 0;
+  idb.del('sesion').catch(() => {});
+}
+
+// ---- Sesión abierta ----
+// El teléfono puede cerrar la app cuando pasas a otra (WhatsApp, etc.). Para no pedir la contraseña al volver,
+// la clave se guarda en IndexedDB mientras no se cumpla el tiempo de bloqueo. Es una CryptoKey NO exportable:
+// sirve para descifrar en este navegador, pero no se puede sacar ni copiar. Al bloquear se borra.
+let sesionExpira = 0;
+/** Guarda (o renueva) la sesión hasta la hora indicada (ms). */
+export async function guardarSesion(expira) {
+  if (!key || !state) return;
+  sesionExpira = expira;
+  try { await idb.set('sesion', { key, expira }); } catch (e) { console.warn('Sesión', e); }
+}
+/** Si hay una sesión vigente, abre los datos sin pedir la contraseña. Devuelve true si lo logró. */
+export async function restaurarSesion() {
+  try {
+    const ses = await idb.get('sesion');
+    if (!ses?.key || !(ses.expira > Date.now())) {
+      if (ses) await idb.del('sesion');
+      return false;
+    }
+    const m = await idb.get('meta');
+    const box = await idb.get('data');
+    if (!m || !box) return false;
+    state = migrate(await C.decryptJSON(ses.key, box));
+    key = ses.key; meta = m; sesionExpira = ses.expira;
+    return true;
+  } catch {
+    try { await idb.del('sesion'); } catch { /* nada */ }
+    state = null; key = null;
+    return false;
+  }
 }
 
 let cola = Promise.resolve();
@@ -103,6 +137,7 @@ export async function changeCredentials(usuarioActual, claveActual, usuarioNuevo
   await idb.set('data', await C.encryptJSON(nk, state));
   await idb.set('meta', m);
   key = nk; meta = m;
+  if (sesionExpira) await guardarSesion(sesionExpira); // la sesión guardada debe usar la clave nueva
   return true;
 }
 

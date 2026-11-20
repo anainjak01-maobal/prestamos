@@ -1,8 +1,8 @@
 {
-  "version": "1.18.1",
+  "version": "1.18.2",
   "fecha": "2026-11-20",
   "novedades": [
-    "Cierre del día: al buscar cualquier fecha, ahora ves el total cobrado ese día, junto a la lista de pagos y debajo de ella (separado en efectivo y transferencia).",
-    "El cierre que compartes por WhatsApp también empieza con el total cobrado."
+    "Si pasas a otra app (por ejemplo WhatsApp) y vuelves, la app ya no te pide la contraseña, aunque el teléfono la haya cerrado por detrás.",
+    "Solo la pide si se cumple el tiempo de bloqueo (Más → Ajustes) o si tocas el candado. Ese tiempo cuenta desde que sales de la app."
   ]
 }

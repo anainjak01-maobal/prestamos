@@ -153,7 +153,7 @@ export function render(app) {
       ${field('Avisar plazos por vencer (días antes)', `<input type="number" name="diasPorVencer" inputmode="numeric" min="1" max="90" value="${diasPorVencer(c)}">`, 'En Inicio y en Préstamos → Por vencer salen los préstamos cuyo plazo se cumple en estos días.')}
       <h3 style="margin-top:6px">Seguridad</h3>
       ${field('Recordar el respaldo cada (días)', `<input type="number" name="diasRespaldo" inputmode="numeric" min="1" max="30" value="${diasRespaldo(c)}">`, `Inicio te avisa cuando pasen estos días sin respaldo, o antes si llevas ${CAMBIOS_RESPALDO} cambios sin respaldar.`)}
-      ${field('Bloquear tras inactividad', `<select name="bloqueoMin">${[[1, '1 minuto'], [3, '3 minutos'], [5, '5 minutos'], [10, '10 minutos'], [30, '30 minutos'], [0, 'Nunca']].map(([v, t]) => `<option value="${v}" ${+c.bloqueoMin === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
+      ${field('Bloquear tras inactividad', `<select name="bloqueoMin">${[[1, '1 minuto'], [3, '3 minutos'], [5, '5 minutos'], [10, '10 minutos'], [30, '30 minutos'], [0, 'Nunca']].map(([v, t]) => `<option value="${v}" ${+c.bloqueoMin === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`, 'Cuenta desde que dejas de tocar la app o pasas a otra (WhatsApp, etc.). Si vuelves antes, sigues adentro sin poner la contraseña.')}
       <button class="btn primary block" type="submit">${icon('check', 'sm')} Guardar ajustes</button>
     </form>
     <div class="list menu">
