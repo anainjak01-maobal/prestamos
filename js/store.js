@@ -80,24 +80,40 @@ export function lock() {
   state = null;
   sesionExpira = 0;
   idb.del('sesion').catch(() => {});
+  try { sessionStorage.removeItem(MARCA); } catch { /* sin sessionStorage */ }
 }
 
 // ---- Sesión abierta ----
 // El teléfono puede cerrar la app cuando pasas a otra (WhatsApp, etc.). Para no pedir la contraseña al volver,
 // la clave se guarda en IndexedDB mientras no se cumpla el tiempo de bloqueo. Es una CryptoKey NO exportable:
 // sirve para descifrar en este navegador, pero no se puede sacar ni copiar. Al bloquear se borra.
+// Además lleva una MARCA que vive en sessionStorage: el navegador la conserva si el teléfono cierra la app por
+// detrás, pero la borra cuando el usuario cierra la app (la desliza en "recientes") o la abre de nuevo desde el
+// ícono en otra ventana. Sin la marca, la sesión no sirve y se pide la contraseña.
+const MARCA = 'cobros-sesion';
 let sesionExpira = 0;
+function marcaSesion() {
+  try {
+    let t = sessionStorage.getItem(MARCA);
+    if (!t) { t = C.toB64(C.randBytes(16)); sessionStorage.setItem(MARCA, t); }
+    return t;
+  } catch { return null; }
+}
 /** Guarda (o renueva) la sesión hasta la hora indicada (ms). */
 export async function guardarSesion(expira) {
   if (!key || !state) return;
+  const marca = marcaSesion();
+  if (!marca) return; // sin sessionStorage no se guarda la sesión: siempre pedirá la contraseña
   sesionExpira = expira;
-  try { await idb.set('sesion', { key, expira }); } catch (e) { console.warn('Sesión', e); }
+  try { await idb.set('sesion', { key, expira, marca }); } catch (e) { console.warn('Sesión', e); }
 }
 /** Si hay una sesión vigente, abre los datos sin pedir la contraseña. Devuelve true si lo logró. */
 export async function restaurarSesion() {
   try {
     const ses = await idb.get('sesion');
-    if (!ses?.key || !(ses.expira > Date.now())) {
+    let marca = null;
+    try { marca = sessionStorage.getItem(MARCA); } catch { /* nada */ }
+    if (!ses?.key || !(ses.expira > Date.now()) || !marca || ses.marca !== marca) {
       if (ses) await idb.del('sesion');
       return false;
     }

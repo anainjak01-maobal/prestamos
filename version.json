@@ -1,9 +1,8 @@
 {
-  "version": "1.19.1",
+  "version": "1.19.2",
   "fecha": "2026-11-20",
   "novedades": [
-    "Corregido: el cierre del día sumaba el total de un préstamo cuando se eliminaba su cartón, en vez de lo que el cliente pagó ese día.",
-    "Desde ahora, al eliminar un cartón la app guarda lo que se pagó cada día (en el préstamo sigues viendo una sola línea “Pagó todo”).",
-    "Los cartones que ya habías eliminado salen aparte en el cierre del día, como “por corregir”: tócalos y escribe cuánto pagó el cliente ese día."
+    "Más seguridad: si cierras la app (deslizándola en las apps recientes), al abrirla otra vez te pide la contraseña.",
+    "Si solo pasas a otra app (por ejemplo WhatsApp) y vuelves antes del tiempo de bloqueo, sigues adentro."
   ]
 }
