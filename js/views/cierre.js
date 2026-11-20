@@ -80,8 +80,13 @@ export function render(app, _p, query) {
     ${cobradoTr || sacado ? '<p class="tiny muted" style="margin:-4px 4px 10px">El efectivo del día no cuenta las transferencias (siguen en la cuenta) y sí suma lo que sacaste de las cuentas ese día.</p>' : ''}
     <button class="btn primary block" data-compartir style="margin-bottom:6px">${icon('share', 'sm')} Compartir cierre</button>
 
-    <div class="section-title">Pagos recibidos <span class="muted">${pagos.length}</span></div>
-    ${pagos.length ? `<div class="list">${pagos.map(({ p, m }) => item(`#/prestamo/${p.id}`, nombre(p), `#${p.id}${esTransferencia(m) ? ` · <span class="tr-tag">transferencia${m.cuenta ? ' ' + esc(m.cuenta) : ''}</span>` : ''}${m.tipo === 'renovacion' ? ' · interés + abono' : ''}${m.nota && m.nota !== 'Importado del Excel' ? ' · ' + esc(m.nota) : ''}`, money(m.valor), 'var(--ok)')).join('')}</div>`
+    <div class="section-title">Pagos recibidos <span class="muted">${pagos.length}${cobrado ? ` · <b style="color:var(--ok)">${money(cobrado)}</b>` : ''}</span></div>
+    ${pagos.length ? `<div class="list">${pagos.map(({ p, m }) => item(`#/prestamo/${p.id}`, nombre(p), `#${p.id}${esTransferencia(m) ? ` · <span class="tr-tag">transferencia${m.cuenta ? ' ' + esc(m.cuenta) : ''}</span>` : ''}${m.tipo === 'renovacion' ? ' · interés + abono' : ''}${m.nota && m.nota !== 'Importado del Excel' ? ' · ' + esc(m.nota) : ''}`, money(m.valor), 'var(--ok)')).join('')}</div>
+      <div class="summary" data-total-cobrado style="margin-top:10px">
+        ${cobradoTr ? `<div class="r"><span>En efectivo (${pagos.length - nTr})</span><b>${money(cobrado - cobradoTr)}</b></div>
+        <div class="r"><span>Por transferencia (${nTr})</span><b>${money(cobradoTr)}</b></div>` : ''}
+        <div class="r total"${cobradoTr ? '' : ' style="border-top:0;margin-top:0;padding-top:4px"'}><span><b>Total cobrado ${esHoy ? 'hoy' : `el ${fdate(fecha)}`}</b><br><span class="tiny muted">${pagos.length} pago${pagos.length === 1 ? '' : 's'}</span></span><b style="color:var(--ok);white-space:nowrap;align-self:center">${money(cobrado)}</b></div>
+      </div>`
       : emptyState('cash', 'Sin pagos este día')}
 
     ${esHoy ? `<div class="section-title">No pagaron hoy <span class="muted">${noPagaron.length}</span></div>
@@ -107,8 +112,8 @@ export function render(app, _p, query) {
   $('[data-compartir]', main).onclick = async () => {
     const t = [];
     t.push(`*Cierre del día · ${fdate(fecha)}*`);
-    t.push(`Cobrado: ${money(cobrado)} (${pagos.length} pagos)`);
-    if (cobradoTr) t.push(`  De eso por transferencia: ${money(cobradoTr)} (${nTr})`);
+    t.push(`*Total cobrado: ${money(cobrado)}* (${pagos.length} pago${pagos.length === 1 ? '' : 's'})`);
+    if (cobradoTr) t.push(`  En efectivo: ${money(cobrado - cobradoTr)} · por transferencia: ${money(cobradoTr)} (${nTr})`);
     if (sacado) t.push(`Sacado de las cuentas: ${money(sacado)}`);
     t.push(`Prestado: ${money(prestado)} (${nuevos.length})`);
     if (totGastos) t.push(`Gastos: ${money(totGastos)}`);

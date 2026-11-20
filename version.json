@@ -1,9 +1,8 @@
 {
-  "version": "1.18.0",
-  "fecha": "2026-11-16",
+  "version": "1.18.1",
+  "fecha": "2026-11-20",
   "novedades": [
-    "El aviso de respaldo ahora sale arriba de todo en Inicio, con los cambios que llevas sin respaldar. Se pone rojo si pasa mucho tiempo.",
-    "Un punto rojo en la pestaña Más te recuerda que el respaldo está pendiente.",
-    "En Ajustes eliges cada cuántos días te lo recuerda (7 por defecto). Si hoy no puedes, toca “Recordar mañana”."
+    "Cierre del día: al buscar cualquier fecha, ahora ves el total cobrado ese día, junto a la lista de pagos y debajo de ella (separado en efectivo y transferencia).",
+    "El cierre que compartes por WhatsApp también empieza con el total cobrado."
   ]
 }
