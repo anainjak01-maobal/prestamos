@@ -1,7 +1,7 @@
 // Service worker: permite instalar la app y usarla sin internet.
 // Estrategia: primero la red (para recibir siempre la última versión) y, sin conexión, la copia guardada.
 // Al cambiar archivos, subir la VERSION para limpiar la caché vieja.
-const VERSION = 'cobros-v30';
+const VERSION = 'cobros-v31';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -36,6 +36,8 @@ const ARCHIVOS = [
   './js/views/informe.js',
   './js/views/reporte.js',
   './js/views/transferencias.js',
+  './js/views/exportar.js',
+  './js/xlsx.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',

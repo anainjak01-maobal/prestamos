@@ -1,10 +1,9 @@
 {
-  "version": "1.20.0",
+  "version": "1.21.0",
   "fecha": "2026-11-20",
   "novedades": [
-    "Cierre del día: arriba ves lo cobrado, lo prestado y el dinero en caja al cierre. Ya no sale un número negativo cuando prestas más de lo que cobraste (los préstamos salen de la caja).",
-    "En la lista de pagos están todos los que pagaron ese día, también los que saldaron (con la marca “saldó”).",
-    "Nueva sección “Terminaron de pagar”, con lo que pagó cada uno ese día y el total pagado.",
-    "Si a un cartón eliminado antes le falta el valor del día, toca “Poner valor” y escríbelo una vez."
+    "Recibo por WhatsApp: al cobrar toca “Guardar y enviar recibo” y al cliente le llega la fecha, el valor y el saldo que le queda. También en Varios pagos, y para reenviarlo toca el pago en el préstamo.",
+    "Marca “No prestarle más”: en la ficha del cliente. Si intentas prestarle, la app te avisa en rojo y te pide confirmar.",
+    "Más → Exportar a Excel: un archivo .xlsx con préstamos, pagos, clientes, gastos y socios (todo o por meses) para revisar en la PC o compartir."
   ]
 }

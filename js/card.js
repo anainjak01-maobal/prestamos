@@ -190,6 +190,34 @@ export function textoEstadoCuenta({ negocio, cliente, calc, ultimos = 8 }) {
   return out.join('\n');
 }
 
+/**
+ * Recibo de pago para el cliente. pagos = movimientos de pago recién registrados (o uno ya registrado).
+ * El saldo es el que quedó después del último de esos pagos (según el libro del préstamo).
+ */
+export function textoRecibo({ negocio, cliente, calc, pagos }) {
+  const nombre = (cliente?.nombre || '').split(/\s+/)[0] || '';
+  const ids = new Set(pagos.map((m) => m.id));
+  const lineas = calc.lineas.filter((l) => l.mov && ids.has(l.mov.id));
+  const saldo = lineas.length ? Math.max(0, lineas[lineas.length - 1].saldo) : calc.saldo;
+  const total = pagos.reduce((a, m) => a + (m.valor || 0), 0);
+  const tr = (m) => (m.medio === 'transferencia' ? ' (transferencia)' : '');
+  const out = [`*${negocio || 'Control de Cobros'}*`, '*Recibo de pago* ✅', ''];
+  out.push(`Hola ${nombre}, recibimos ${pagos.length > 1 ? 'sus pagos' : 'su pago'}:`);
+  if (pagos.length === 1) {
+    const m = pagos[0];
+    out.push(`• Fecha: ${fdate(m.fecha)}`);
+    out.push(`• Valor: *${money(m.valor)}*${tr(m)}`);
+  } else {
+    for (const m of [...pagos].sort((a, b) => (a.fecha < b.fecha ? -1 : 1))) out.push(`• ${fdate(m.fecha)}: ${money(m.valor)}${tr(m)}`);
+    out.push(`Total abonado: *${money(total)}*`);
+  }
+  out.push(`• Préstamo #${calc.p.id}`);
+  out.push('');
+  out.push(saldo > 0 ? `*Saldo pendiente: ${money(saldo)}*` : '*¡Préstamo pagado completo! Queda a paz y salvo.*');
+  out.push('', 'Gracias por su pago.');
+  return out.join('\n');
+}
+
 /** Mensaje de recordatorio de cobro para un cliente atrasado. */
 export function textoRecordatorio({ negocio, cliente, calc }, { previo = false } = {}) {
   const nombre = (cliente?.nombre || '').split(/\s+/)[0] || '';

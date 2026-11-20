@@ -7,6 +7,7 @@ import { exportBackup, pickBackupFile, pickMigrationFile, estadoRespaldo, diasRe
 import { VERSION } from '../version.js';
 import { buscarActualizacion } from '../update.js';
 import { importarAdicionales } from './adicionales.js';
+import { abrirExportar } from './exportar.js';
 import { diasPorVencer } from '../logic.js';
 
 const VERSION_APP = VERSION;
@@ -34,6 +35,7 @@ export function mas(app) {
     <div class="section-title">Respaldo</div>
     <div class="list menu">
       <button class="item" data-o="exportar"><span class="ico ${pend ? 'tone-danger' : 'tone-ok'}">${icon('download')}</span><span class="grow"><span class="t">Exportar respaldo${pend ? ' <span class="badge b-danger">Pendiente</span>' : ''}</span><br><span class="s">Último: ${esc(infoRespaldo(s.config))}${s.config.cambiosSinRespaldo ? ` · ${s.config.cambiosSinRespaldo} cambio${s.config.cambiosSinRespaldo === 1 ? '' : 's'} sin respaldar` : ''}</span></span>${icon('next', 'sm')}</button>
+      <button class="item" data-o="excelExportar"><span class="ico tone-ok">${icon('file')}</span><span class="grow"><span class="t">Exportar a Excel</span><br><span class="s">Préstamos, pagos y clientes en un archivo .xlsx</span></span>${icon('next', 'sm')}</button>
       <button class="item" data-o="importar"><span class="ico tone-warn">${icon('upload')}</span><span class="grow"><span class="t">Importar respaldo</span><br><span class="s">Reemplaza los datos de este teléfono</span></span>${icon('next', 'sm')}</button>
       <button class="item" data-o="excel"><span class="ico tone-info">${icon('file')}</span><span class="grow"><span class="t">Importar desde Excel</span><br><span class="s">Archivo migracion-excel.json</span></span>${icon('next', 'sm')}</button>
       <button class="item" data-o="adicionales"><span class="ico tone-violet">${icon('percent')}</span><span class="grow"><span class="t">Importar adicionales del Excel</span><br><span class="s">Archivo adicionales-excel.json · solo agrega</span></span>${icon('next', 'sm')}</button>
@@ -49,6 +51,7 @@ export function mas(app) {
     const o = e.target.closest('[data-o]')?.dataset.o;
     if (o === 'exportar') exportar(app);
     else if (o === 'importar') importar(app);
+    else if (o === 'excelExportar') abrirExportar(app);
     else if (o === 'excel') importarExcel(app);
     else if (o === 'adicionales') importarAdicionales(app);
     else if (o === 'bloquear') app.lock();

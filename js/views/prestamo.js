@@ -6,8 +6,8 @@ import { sheet, confirmDialog, toast, field, moneyField, segHtml, segValue, swit
 import { getCliente, getPrestamo, addMov, addPrestamo } from '../store.js';
 import * as store from '../store.js';
 import { estadoBadge } from './prestamos.js';
-import { abrirFormCliente, calificacionDe, calBadge, selectorClienteHtml, bindSelectorCliente } from './clientes.js';
-import { drawCard, shareCardImage, textoEstadoCuenta, textoRecordatorio, openWhatsApp } from '../card.js';
+import { abrirFormCliente, calificacionDe, calBadge, selectorClienteHtml, bindSelectorCliente, noPrestarHtml } from './clientes.js';
+import { drawCard, shareCardImage, textoEstadoCuenta, textoRecordatorio, textoRecibo, openWhatsApp } from '../card.js';
 
 const cfg = () => store.state.config;
 const refreshLuego = (app, fn) => afterLayers(() => (fn ? fn() : app.refresh()));
@@ -228,7 +228,8 @@ export function nuevo(app, _p, query) {
     if (!id) { box.innerHTML = ''; return; }
     const cal = calificacionDe(app, id);
     const deuda = store.prestamosDe(id).map((p) => calcular(p, today(), cfg())).filter((x) => x.activo).reduce((s, x) => s + x.saldo, 0);
-    box.innerHTML = `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:2px">${calBadge(cal)}${deuda > 0 ? `<span class="badge b-warn">Debe ${money(deuda)}</span>` : ''}</div>
+    const clSel = getCliente(id);
+    box.innerHTML = `${clSel?.noPrestar ? `<div style="margin-top:8px">${noPrestarHtml(clSel)}</div>` : ''}<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:2px">${calBadge(cal)}${deuda > 0 ? `<span class="badge b-warn">Debe ${money(deuda)}</span>` : ''}</div>
       ${cal.nivel === 'malo' || cal.nivel === 'regular' ? `<div class="muted" style="margin-top:6px">${esc(cal.motivos[0] || '')}</div>` : ''}`;
   };
   form.cliente.addEventListener('change', mostrarCal);
@@ -242,6 +243,8 @@ export function nuevo(app, _p, query) {
     if (!clienteId) return toast('Elige el cliente', 'err');
     if (!(x.capital > 0)) return toast('Escribe el valor prestado', 'err');
     if (!(x.valorCuota > 0)) return toast('Revisa el valor de la cuota', 'err');
+    const clN = getCliente(clienteId);
+    if (clN?.noPrestar && !(await confirmDialog({ title: '⛔ Este cliente está marcado', text: `Marcaste a <b>${esc(clN.nombre)}</b> para no prestarle más${clN.noPrestar.motivo ? `: “${esc(clN.noPrestar.motivo)}”` : ''}. ¿Prestarle de todos modos?`, ok: 'Sí, prestarle', danger: true }))) return;
     const { interes: _interes, ...cond0 } = x;
     const fijo = ir.override(x.tasa);
     const p = addPrestamo({
@@ -533,7 +536,7 @@ export function abrirPago(app, p, { onDone, valor, fecha, medio: medioPre, cuent
       ${medioHtml(medioPre ? { medio: medioPre, cuenta: cuentaPre } : medioSugerido(p))}
       ${field('Nota', '<input name="nota" placeholder="Opcional">')}
       <div class="summary" data-res></div>
-      <div class="btn-row"><button class="btn" data-ok="wa">${icon('chat', 'sm')} Guardar y avisar</button><button class="btn primary" data-ok="1">${icon('check', 'sm')} Guardar</button></div>`,
+      <div class="btn-row"><button class="btn" data-ok="wa">${icon('chat', 'sm')} Guardar y enviar recibo</button><button class="btn primary" data-ok="1">${icon('check', 'sm')} Guardar</button></div>`,
     onMount(el, api) {
       $('[data-varios]', el)?.addEventListener('click', () => {
         api.close();
@@ -560,11 +563,11 @@ export function abrirPago(app, p, { onDone, valor, fecha, medio: medioPre, cuent
         if (!(v > 0)) return toast('Escribe el valor del pago', 'err');
         if (v > c.saldo) return toast('El pago no puede ser mayor que el saldo', 'err');
         const md = medio();
-        addMov(p, aplicarMedio({ tipo: 'pago', fecha: $('[name=fecha]', el).value || today(), valor: v, nota: $('[name=nota]', el).value.trim() }, md));
+        const nuevo = addMov(p, aplicarMedio({ tipo: 'pago', fecha: $('[name=fecha]', el).value || today(), valor: v, nota: $('[name=nota]', el).value.trim() }, md));
         await app.save();
         api.close();
         toast(v >= c.saldo ? '¡Préstamo pagado completo!' : `Pago de ${money(v)} registrado${md.medio ? ' · transferencia por retirar' : ''}`);
-        if (b.dataset.ok === 'wa') enviarTexto(p);
+        if (b.dataset.ok === 'wa') enviarRecibo(p, [nuevo]);
         refreshLuego(app, onDone);
       }));
     },
@@ -604,7 +607,7 @@ export function abrirVariosPagos(app, p, { onDone } = {}) {
       <button type="button" class="btn ghost sm" data-agregar style="padding-left:0;margin:4px 0 12px">${icon('plus', 'sm')} Agregar otro pago</button>
       ${medioHtml(medioSugerido(p))}
       <div class="summary" data-res></div>
-      <button class="btn primary block" data-ok>${icon('check', 'sm')} Guardar pagos marcados</button>`,
+      <div class="btn-row"><button class="btn" data-ok="wa">${icon('chat', 'sm')} Guardar y enviar recibo</button><button class="btn primary" data-ok="1">${icon('check', 'sm')} Guardar</button></div>`,
     onMount(el, api) {
       const cont = $('[data-filas]', el);
       const medio = bindMedio(el);
@@ -641,19 +644,20 @@ export function abrirVariosPagos(app, p, { onDone } = {}) {
         upd();
       };
       upd();
-      $('[data-ok]', el).onclick = async () => {
+      $$('[data-ok]', el).forEach((boton) => (boton.onclick = async () => {
         const m = marcados();
         if (!m.length) return toast('Marca al menos un pago', 'err');
         if (m.some((x) => !x.fecha || !(x.valor > 0))) return toast('Revisa la fecha y el valor de cada pago marcado', 'err');
         if (m.some((x) => x.fecha > hoy)) return toast('No puede haber pagos con fecha futura', 'err');
         const tot = m.reduce((s, x) => s + x.valor, 0);
         if (tot > c.saldo) return toast('Los pagos superan el saldo del préstamo', 'err');
-        m.sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).forEach((x, i) => addMov(p, aplicarMedio({ tipo: 'pago', fecha: x.fecha, valor: x.valor, nota: '', ts: Date.now() + i }, medio())));
+        const nuevos = m.sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).map((x, i) => addMov(p, aplicarMedio({ tipo: 'pago', fecha: x.fecha, valor: x.valor, nota: '', ts: Date.now() + i }, medio())));
         await app.save();
         api.close();
         toast(`${m.length} pago${m.length > 1 ? 's' : ''} registrado${m.length > 1 ? 's' : ''} · ${money(tot)}`);
+        if (boton.dataset.ok === 'wa') enviarRecibo(p, nuevos);
         refreshLuego(app, onDone);
-      };
+      }));
     },
   });
 }
@@ -956,9 +960,11 @@ function abrirMovimiento(app, p, m) {
           ${m.nota ? `<div class="r"><span>Nota</span><b>${esc(m.nota)}</b></div>` : ''}</div>
           ${m.tipo === 'renovacion' ? `${medioHtml(m, { conRetiro: true })}<button class="btn block" data-medio style="margin-bottom:10px">${icon('check', 'sm')} Guardar cómo pagó</button>` : ''}
           <p class="small muted">${m.tipo === 'renovacion' ? 'Para cambiar las condiciones del ciclo usa “Editar”. Si lo eliminas, el préstamo vuelve a las condiciones anteriores.' : 'Si lo eliminas, la app volverá a avisarte de este interés.'}</p>`}
+      ${m.tipo === 'pago' || m.tipo === 'renovacion' ? `<button class="btn block" data-recibo style="margin-bottom:10px">${icon('chat', 'sm')} Enviar recibo de este pago</button>` : ''}
       <button class="btn danger block" data-del>${icon('trash', 'sm')} Eliminar movimiento</button>`,
     onMount(el, api) {
       const medio = (m.tipo === 'pago' || m.tipo === 'renovacion') ? bindMedio(el) : null;
+      $('[data-recibo]', el)?.addEventListener('click', () => { api.close(); enviarRecibo(p, [m]); });
       $('[data-medio]', el)?.addEventListener('click', async () => {
         aplicarMedio(m, medio());
         await app.save();
@@ -1039,6 +1045,23 @@ export async function enviarTarjeta(p) {
   const d = datosTarjeta(p);
   const r = await shareCardImage(drawCard(d), d.cliente);
   if (r === 'descarga') toast('Imagen descargada. Envíala por WhatsApp desde tu galería.');
+}
+/** Recibo por WhatsApp de uno o varios pagos (si el cliente no tiene teléfono, se comparte o se copia). */
+export async function enviarRecibo(p, pagos) {
+  const d = datosTarjeta(p);
+  return enviarAlCliente(d.cliente, textoRecibo({ ...d, pagos }));
+}
+async function enviarAlCliente(cliente, texto) {
+  if (cliente?.telefono) return openWhatsApp(cliente.telefono, texto, cfg().indicativo);
+  if (navigator.share) {
+    try { await navigator.share({ text: texto }); return; } catch { /* cancelado */ }
+  }
+  try {
+    await navigator.clipboard.writeText(texto);
+    toast('El cliente no tiene teléfono. Texto copiado.');
+  } catch {
+    toast('El cliente no tiene teléfono registrado', 'err');
+  }
 }
 export async function enviarTexto(p) {
   const d = datosTarjeta(p);

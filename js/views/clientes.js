@@ -1,12 +1,19 @@
 // Clientes: lista, detalle y formulario.
 import { icon } from '../icons.js';
-import { $, esc, money, norm, avatarTone, initials, today, waPhone } from '../utils.js';
+import { $, esc, money, norm, avatarTone, initials, today, waPhone, fdate } from '../utils.js';
 import { calcular, calificarCliente } from '../logic.js';
 import { sheet, toast, field, confirmDialog, emptyState, afterLayers } from '../ui.js';
 import * as store from '../store.js';
 import { itemPrestamo, bindLista, estadoBadge } from './prestamos.js';
 
 let busqueda = '';
+
+/** Marca manual "No prestarle más": cliente.noPrestar = { fecha, motivo }. */
+export const noPrestarHtml = (cl, { corto = false } = {}) => (cl?.noPrestar
+  ? (corto ? '<span class="badge b-danger">⛔ No prestar</span>'
+    : `<div class="alert danger">${icon('ban')}<div class="grow"><b>No prestarle más</b>
+        <p>${cl.noPrestar.motivo ? esc(cl.noPrestar.motivo) : 'Sin motivo anotado.'} <span class="muted">· desde el ${fdate(cl.noPrestar.fecha)}</span></p></div></div>`)
+  : '');
 
 // ---------------------------------------------------------------------
 // Selector de cliente con buscador. Reemplaza al <select>: un botón que abre una hoja con un cuadro de
@@ -60,7 +67,7 @@ function abrirBuscadorCliente({ actual, permitirVacio, onNuevo, onPick }) {
           + (lista.length
             ? `<div class="list">${lista.slice(0, 200).map((c) => `<div class="item ${c.id === actual ? 'sel' : ''}" data-id="${c.id}">
                 <div class="avatar ${avatarTone(c.nombre)}">${esc(initials(c.nombre))}</div>
-                <div class="grow"><div class="t ellipsis">${esc(c.nombre)}</div><div class="s ellipsis">${esc([c.codigo, c.cedula ? 'CC ' + c.cedula : '', c.telefono].filter(Boolean).join(' · ') || 'Sin datos')}</div></div>
+                <div class="grow"><div class="t ellipsis">${esc(c.nombre)}</div><div class="s ellipsis">${c.noPrestar ? '<b style="color:var(--danger)">⛔ No prestar</b> · ' : ''}${esc([c.codigo, c.cedula ? 'CC ' + c.cedula : '', c.telefono].filter(Boolean).join(' · ') || 'Sin datos')}</div></div>
                 ${c.id === actual ? `<div class="end" style="color:var(--primary)">${icon('check', 'sm')}</div>` : ''}</div>`).join('')}</div>
               ${lista.length > 200 ? '<p class="small muted" style="margin:8px 4px">Hay más resultados: escribe más letras para encontrarlo.</p>' : ''}`
             : emptyState('search', 'Sin resultados', 'Prueba con otro nombre, la cédula o el teléfono.'))
@@ -118,7 +125,7 @@ export function lista(app) {
       ? `<p class="small muted" style="margin:0 4px 8px">${items.length} cliente${items.length > 1 ? 's' : ''}</p><div class="list">${items.map(({ c, r }) => `
         <div class="item" data-href="#/cliente/${c.id}">
           <div class="avatar ${avatarTone(c.nombre)}">${esc(initials(c.nombre))}</div>
-          <div class="grow"><div class="t ellipsis">${esc(c.nombre)}</div><div class="s ellipsis">${r.cal.emoji} ${esc(r.cal.txt)} · ${esc([c.codigo, c.telefono].filter(Boolean).join(' · ') || 'Sin teléfono')}</div></div>
+          <div class="grow"><div class="t ellipsis">${esc(c.nombre)}</div><div class="s ellipsis">${c.noPrestar ? '<b style="color:var(--danger)">⛔ No prestar</b>' : `${r.cal.emoji} ${esc(r.cal.txt)}`} · ${esc([c.codigo, c.telefono].filter(Boolean).join(' · ') || 'Sin teléfono')}</div></div>
           <div class="end">${r.activos.length ? `<span class="amt num">${money(r.saldo)}</span>${estadoBadge(r.peor)}` : '<span class="badge b-muted">Sin deuda</span>'}</div>
         </div>`).join('')}</div>`
       : app.state.clientes.length
@@ -162,6 +169,7 @@ export function detalle(app, id) {
         ${cl.telefono ? `<a class="btn" href="tel:${esc(cl.telefono)}">${icon('phone', 'sm')} Llamar</a><a class="btn" href="https://wa.me/${tel}" target="_blank" rel="noopener">${icon('chat', 'sm')} WhatsApp</a>` : `<button class="btn" data-edit>${icon('phone', 'sm')} Agregar teléfono</button>`}
       </div>
     </div>
+    ${cl.noPrestar ? `<div style="margin-top:12px">${noPrestarHtml(cl)}</div>` : ''}
     <div class="kpis">
       <div class="kpi"><div class="ico tone-warn">${icon('wallet', 'sm')}</div><div class="v num">${money(r.saldo)}</div><div class="l">Debe ahora</div></div>
       <div class="kpi"><div class="ico tone-ok">${icon('cash', 'sm')}</div><div class="v num">${money(pagado)}</div><div class="l">Total pagado</div></div>
@@ -184,7 +192,9 @@ export function detalle(app, id) {
         <b style="color:var(--violet)">${money(adicHist.reduce((s, a) => s + a.valor, 0))}</b></a>
       <ul class="small muted" style="margin:8px 0 0;padding-left:18px">${adicHist.map((a) => `<li>${money(a.valor)}${a.nota ? ` · ${esc(a.nota)}` : ''}</li>`).join('')}</ul>
     </div>` : ''}
+    <button class="btn block" data-noprestar style="margin-top:14px">${icon(cl.noPrestar ? 'checkCircle' : 'ban', 'sm')} ${cl.noPrestar ? 'Quitar la marca “No prestarle más”' : 'Marcar: no prestarle más'}</button>
     <button class="btn danger block" data-del style="margin-top:10px">${icon('trash', 'sm')} Eliminar cliente</button>`;
+  $('[data-noprestar]', main).onclick = () => marcarNoPrestar(app, cl);
   bindLista(main, app);
   main.parentElement.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => abrirFormCliente(app, cl, () => afterLayers(() => app.refresh()))));
   $('[data-del]', main).onclick = async () => {
@@ -195,6 +205,35 @@ export function detalle(app, id) {
     toast('Cliente eliminado');
     app.go('#/clientes');
   };
+}
+
+/** Poner o quitar la marca "No prestarle más". */
+async function marcarNoPrestar(app, cl) {
+  if (cl.noPrestar) {
+    if (!(await confirmDialog({ title: '¿Quitar la marca?', text: `${esc(cl.nombre)} volverá a quedar disponible para préstamos.`, ok: 'Quitar marca' }))) return;
+    delete cl.noPrestar;
+    await app.save();
+    toast('Marca quitada');
+    return app.refresh();
+  }
+  sheet({
+    title: 'No prestarle más',
+    ico: 'ban',
+    tone: 'tone-danger',
+    body: `<p class="small muted" style="margin-top:-6px">${esc(cl.nombre)}. Si más adelante intentas hacerle un préstamo, la app te avisará en rojo. Sus préstamos actuales siguen igual.</p>
+      ${field('Motivo', '<textarea name="motivo" placeholder="Ej: no pagó, se mudó sin avisar, problemas…"></textarea>', 'Solo lo ves tú.')}
+      <button class="btn danger block" data-ok>${icon('ban', 'sm')} Marcar: no prestarle más</button>`,
+    onMount(el, api) {
+      setTimeout(() => $('[name=motivo]', el).focus(), 280);
+      $('[data-ok]', el).onclick = async () => {
+        cl.noPrestar = { fecha: today(), motivo: $('[name=motivo]', el).value.trim() };
+        await app.save();
+        api.close();
+        toast('Marcado: no prestarle más');
+        app.refresh();
+      };
+    },
+  });
 }
 
 /** Formulario de cliente (nuevo o editar). onSaved(cliente) se llama después de guardar. */
